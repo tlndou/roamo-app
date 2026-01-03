@@ -6,9 +6,18 @@ import { Button } from "@/components/ui/button"
 import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
 
+interface NavigationState {
+  level: "continent" | "country" | "city" | "spots"
+  continent?: string
+  country?: string
+  city?: string
+}
+
 interface ListViewProps {
   spots: Spot[]
   onDeleteSpot: (id: string) => void
+  navigation: NavigationState
+  onNavigationChange: (nav: NavigationState) => void
 }
 
 interface GroupedSpots {
@@ -26,8 +35,7 @@ interface NavigationState {
   city?: string
 }
 
-export function ListView({ spots, onDeleteSpot }: ListViewProps) {
-  const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
+export function ListView({ spots, onDeleteSpot, navigation, onNavigationChange }: ListViewProps) {
 
   const groupedSpots = useMemo(() => {
     const grouped: GroupedSpots = {}
@@ -45,19 +53,19 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
   }, [spots])
 
   const breadcrumbs = useMemo(() => {
-    const crumbs = [{ label: "Continents", onClick: () => setNavigation({ level: "continent" }) }]
+    const crumbs = [{ label: "Continents", onClick: () => onNavigationChange({ level: "continent" }) }]
 
     if (navigation.continent) {
       crumbs.push({
         label: navigation.continent,
-        onClick: () => setNavigation({ level: "country", continent: navigation.continent }),
+        onClick: () => onNavigationChange({ level: "country", continent: navigation.continent }),
       })
     }
 
     if (navigation.country) {
       crumbs.push({
         label: navigation.country,
-        onClick: () => setNavigation({ level: "city", continent: navigation.continent, country: navigation.country }),
+        onClick: () => onNavigationChange({ level: "city", continent: navigation.continent, country: navigation.country }),
       })
     }
 
@@ -66,7 +74,7 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
     }
 
     return crumbs
-  }, [navigation])
+  }, [navigation, onNavigationChange])
 
   if (navigation.level === "continent") {
     const continents = Object.entries(groupedSpots).map(([continent, countries]) => {
@@ -83,7 +91,7 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
           {continents.map(({ name, count }) => (
             <button
               key={name}
-              onClick={() => setNavigation({ level: "country", continent: name })}
+              onClick={() => onNavigationChange({ level: "country", continent: name })}
               className="group flex items-center justify-between rounded-lg border border-border bg-card p-6 text-left transition-all hover:border-foreground/20 hover:bg-accent/50"
             >
               <div>
@@ -127,7 +135,7 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
           {countries.map(({ name, count }) => (
             <button
               key={name}
-              onClick={() => setNavigation({ level: "city", continent: navigation.continent, country: name })}
+              onClick={() => onNavigationChange({ level: "city", continent: navigation.continent, country: name })}
               className="group flex items-center justify-between rounded-lg border border-border bg-card p-6 text-left transition-all hover:border-foreground/20 hover:bg-accent/50"
             >
               <div>
@@ -173,7 +181,7 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
             <button
               key={name}
               onClick={() =>
-                setNavigation({
+                onNavigationChange({
                   level: "spots",
                   continent: navigation.continent,
                   country: navigation.country,
@@ -222,10 +230,10 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
               key={spot.id}
               className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
             >
-              {/* Thumbnail */}
-              {spot.thumbnail ? (
+              {/* Icon or Image */}
+              {spot.useCustomImage && spot.customImage ? (
                 <img
-                  src={spot.thumbnail || "/placeholder.svg"}
+                  src={spot.customImage}
                   alt={spot.name}
                   className="h-16 w-16 rounded-md object-cover"
                 />

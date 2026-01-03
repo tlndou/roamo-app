@@ -49,7 +49,7 @@ export function LocationAutocomplete({
   const [results, setResults] = useState<LocationResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
-  const debounceRef = useRef<NodeJS.Timeout>()
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside

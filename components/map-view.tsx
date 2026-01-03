@@ -11,8 +11,16 @@ const TileLayer = dynamic(() => import("react-leaflet").then((mod) => mod.TileLa
 const Marker = dynamic(() => import("react-leaflet").then((mod) => mod.Marker), { ssr: false })
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), { ssr: false })
 
+interface NavigationState {
+  level: "continent" | "country" | "city" | "spots"
+  continent?: string
+  country?: string
+  city?: string
+}
+
 interface MapViewProps {
   spots: Spot[]
+  navigation?: NavigationState
 }
 
 // Fix for default marker icons in Leaflet
@@ -44,22 +52,39 @@ const createCustomIcon = (count: number) => {
   })
 }
 
-function MapBounds({ spots }: { spots: Spot[] }) {
+function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: NavigationState }) {
   const { useMap } = require("react-leaflet")
   const map = useMap()
 
   useEffect(() => {
     if (spots.length > 0 && typeof window !== "undefined") {
       const L = require("leaflet")
-      const bounds = L.latLngBounds(spots.map((spot: Spot) => [spot.coordinates.lat, spot.coordinates.lng]))
-      map.fitBounds(bounds, { padding: [50, 50] })
+
+      // Filter spots based on navigation
+      let filteredSpots = spots
+      if (navigation) {
+        if (navigation.continent) {
+          filteredSpots = spots.filter((s) => s.continent === navigation.continent)
+        }
+        if (navigation.country) {
+          filteredSpots = filteredSpots.filter((s) => s.country === navigation.country)
+        }
+        if (navigation.city) {
+          filteredSpots = filteredSpots.filter((s) => s.city === navigation.city)
+        }
+      }
+
+      if (filteredSpots.length > 0) {
+        const bounds = L.latLngBounds(filteredSpots.map((spot: Spot) => [spot.coordinates.lat, spot.coordinates.lng]))
+        map.fitBounds(bounds, { padding: [50, 50] })
+      }
     }
-  }, [spots, map])
+  }, [spots, navigation, map])
 
   return null
 }
 
-export function MapView({ spots }: MapViewProps) {
+export function MapView({ spots, navigation }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -126,7 +151,7 @@ export function MapView({ spots }: MapViewProps) {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <MapBounds spots={spots} />
+          <MapBounds spots={spots} navigation={navigation} />
           {Object.entries(citySpotCounts).map(([key, data]) => (
             <Marker
               key={key}
