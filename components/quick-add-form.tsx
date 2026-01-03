@@ -32,6 +32,8 @@ export function QuickAddForm({ onSubmit }: QuickAddFormProps) {
       name: "Extracted Restaurant",
       city: "City Name",
       country: "Country Name",
+      continent: "Europe",
+      coordinates: { lat: 0, lng: 0 },
       comments: "Auto-extracted from link",
       thumbnail: "",
       link: url,

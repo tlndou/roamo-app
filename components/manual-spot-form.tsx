@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { LocationAutocomplete } from "@/components/location-autocomplete"
 import type { Spot, SpotCategory } from "@/types/spot"
+import { getCountryContinent } from "@/lib/country-utils"
 
 interface ManualSpotFormProps {
   onSubmit: (spot: Spot) => void
@@ -27,15 +29,35 @@ const categories: { value: SpotCategory; label: string }[] = [
 ]
 
 export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
+  const [locationSearch, setLocationSearch] = useState("")
   const [formData, setFormData] = useState({
     category: "restaurant" as SpotCategory,
     name: "",
     city: "",
     country: "",
+    continent: "",
+    coordinates: { lat: 0, lng: 0 },
     comments: "",
     thumbnail: "",
     link: "",
   })
+
+  const handleLocationSelect = (location: {
+    city: string
+    country: string
+    coordinates: { lat: number; lng: number }
+  }) => {
+    // Get continent from country
+    const continent = getCountryContinent(location.country)
+
+    setFormData({
+      ...formData,
+      city: location.city,
+      country: location.country,
+      continent,
+      coordinates: location.coordinates,
+    })
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,28 +99,20 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="city">City</Label>
-          <Input
-            id="city"
-            value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-            placeholder="Amsterdam"
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="country">Country</Label>
-          <Input
-            id="country"
-            value={formData.country}
-            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-            placeholder="Netherlands"
-            required
-          />
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="location">Location</Label>
+        <LocationAutocomplete
+          value={locationSearch}
+          onChange={setLocationSearch}
+          onLocationSelect={handleLocationSelect}
+          placeholder="Search for a city..."
+          required
+        />
+        {formData.city && formData.country && (
+          <p className="text-xs text-muted-foreground">
+            Selected: {formData.city}, {formData.country} ({formData.continent})
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">

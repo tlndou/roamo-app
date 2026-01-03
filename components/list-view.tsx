@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { ChevronRight, ExternalLink, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Spot } from "@/types/spot"
+import { getCountryContinent } from "@/lib/country-utils"
 
 interface ListViewProps {
   spots: Spot[]
@@ -25,30 +26,6 @@ interface NavigationState {
   city?: string
 }
 
-// Simple continent mapping (in production, use a proper geocoding service)
-const countryToContinentMap: Record<string, string> = {
-  netherlands: "Europe",
-  france: "Europe",
-  spain: "Europe",
-  italy: "Europe",
-  usa: "North America",
-  canada: "North America",
-  mexico: "North America",
-  japan: "Asia",
-  thailand: "Asia",
-  china: "Asia",
-  australia: "Oceania",
-  "new zealand": "Oceania",
-  brazil: "South America",
-  argentina: "South America",
-  "south africa": "Africa",
-  egypt: "Africa",
-}
-
-function getContinent(country: string): string {
-  return countryToContinentMap[country.toLowerCase()] || "Other"
-}
-
 export function ListView({ spots, onDeleteSpot }: ListViewProps) {
   const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
 
@@ -56,7 +33,8 @@ export function ListView({ spots, onDeleteSpot }: ListViewProps) {
     const grouped: GroupedSpots = {}
 
     spots.forEach((spot) => {
-      const continent = getContinent(spot.country)
+      // Use the spot's continent field if available, otherwise determine from country
+      const continent = spot.continent || getCountryContinent(spot.country)
       if (!grouped[continent]) grouped[continent] = {}
       if (!grouped[continent][spot.country]) grouped[continent][spot.country] = {}
       if (!grouped[continent][spot.country][spot.city]) grouped[continent][spot.country][spot.city] = []
