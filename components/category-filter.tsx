@@ -25,7 +25,7 @@ export function CategoryFilter({ selectedCategory, onCategoryChange, spots }: Ca
         <SelectTrigger className="w-[180px]">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="z-[9999]">
           <SelectItem value="all">All Categories ({spots.length})</SelectItem>
           {Object.entries(categoryCounts).map(([category, count]) => (
             <SelectItem key={category} value={category}>
