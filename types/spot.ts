@@ -1,4 +1,4 @@
-export type SpotCategory = "restaurant" | "cafe" | "bar" | "museum" | "park" | "attraction" | "hotel" | "shop" | "other"
+export type SpotCategory = "restaurant" | "cafe" | "bar" | "museum" | "park" | "attraction" | "activity" | "event" | "club" | "hotel" | "shop" | "other"
 
 export type IconColor =
   | "grey"
