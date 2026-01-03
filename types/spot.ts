@@ -6,7 +6,12 @@ export interface Spot {
   name: string
   city: string
   country: string
+  continent?: string
   comments?: string
   thumbnail?: string
   link?: string
+  coordinates: {
+    lat: number
+    lng: number
+  }
 }
