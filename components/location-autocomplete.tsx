@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils"
 interface LocationResult {
   display_name: string
   address: {
+    house_number?: string
+    road?: string
     city?: string
     town?: string
     village?: string
@@ -21,6 +23,7 @@ interface LocationResult {
 interface LocationData {
   city: string
   country: string
+  address?: string
   coordinates: {
     lat: number
     lng: number
@@ -79,8 +82,7 @@ export function LocationAutocomplete({
             `q=${encodeURIComponent(value)}&` +
             `format=json&` +
             `addressdetails=1&` +
-            `limit=5&` +
-            `featuretype=city`,
+            `limit=5`,
           {
             headers: {
               "User-Agent": "TravelSpotsApp/1.0",
@@ -109,9 +111,17 @@ export function LocationAutocomplete({
     const city = result.address.city || result.address.town || result.address.village || ""
     const country = result.address.country || ""
 
+    // Extract street address if available for more precise locations
+    const streetParts = [
+      result.address.house_number,
+      result.address.road,
+    ].filter((part): part is string => Boolean(part))
+    const streetAddress = streetParts.length > 0 ? streetParts.join(" ") : undefined
+
     onLocationSelect({
       city,
       country,
+      address: streetAddress,
       coordinates: {
         lat: parseFloat(result.lat),
         lng: parseFloat(result.lon),

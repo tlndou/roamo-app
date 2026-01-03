@@ -7,6 +7,7 @@ export interface Spot {
   city: string
   country: string
   continent: string
+  address?: string
   comments?: string
   thumbnail?: string
   link?: string

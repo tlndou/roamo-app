@@ -36,6 +36,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     city: "",
     country: "",
     continent: "",
+    address: "",
     coordinates: { lat: 0, lng: 0 },
     comments: "",
     thumbnail: "",
@@ -45,6 +46,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
   const handleLocationSelect = (location: {
     city: string
     country: string
+    address?: string
     coordinates: { lat: number; lng: number }
   }) => {
     // Get continent from country
@@ -55,6 +57,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
       city: location.city,
       country: location.country,
       continent,
+      address: location.address || "",
       coordinates: location.coordinates,
     })
   }
@@ -105,7 +108,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
           value={locationSearch}
           onChange={setLocationSearch}
           onLocationSelect={handleLocationSelect}
-          placeholder="Search for a city..."
+          placeholder="Search for a city or address..."
           required
         />
         {formData.city && formData.country && (
@@ -114,6 +117,21 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
           </p>
         )}
       </div>
+
+      {formData.city && (
+        <div className="space-y-2">
+          <Label htmlFor="address">Street Address (optional)</Label>
+          <Input
+            id="address"
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            placeholder="123 Main Street"
+          />
+          <p className="text-xs text-muted-foreground">
+            Add a specific address for more precise map location
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="comments">Comments</Label>
