@@ -1,0 +1,61 @@
+import {
+  UtensilsCrossed,
+  Coffee,
+  Wine,
+  Building2,
+  Trees,
+  Camera,
+  BedDouble,
+  ShoppingBag,
+  MapPin,
+  type LucideIcon,
+} from "lucide-react"
+import type { SpotCategory, IconColor } from "@/types/spot"
+
+export const categoryIcons: Record<SpotCategory, LucideIcon> = {
+  restaurant: UtensilsCrossed,
+  cafe: Coffee,
+  bar: Wine,
+  museum: Building2,
+  park: Trees,
+  attraction: Camera,
+  hotel: BedDouble,
+  shop: ShoppingBag,
+  other: MapPin,
+}
+
+export const iconColorClasses: Record<IconColor, string> = {
+  grey: "text-gray-400",
+  pink: "text-pink-500",
+  "pink-pastel": "text-pink-300",
+  purple: "text-purple-500",
+  "purple-pastel": "text-purple-300",
+  blue: "text-blue-500",
+  "blue-pastel": "text-blue-300",
+  green: "text-green-500",
+  "green-pastel": "text-green-300",
+  yellow: "text-yellow-500",
+  "yellow-pastel": "text-yellow-300",
+  orange: "text-orange-500",
+  "orange-pastel": "text-orange-300",
+  red: "text-red-500",
+  "red-pastel": "text-red-300",
+}
+
+export const iconColorBgClasses: Record<IconColor, string> = {
+  grey: "bg-gray-100",
+  pink: "bg-pink-50",
+  "pink-pastel": "bg-pink-50",
+  purple: "bg-purple-50",
+  "purple-pastel": "bg-purple-50",
+  blue: "bg-blue-50",
+  "blue-pastel": "bg-blue-50",
+  green: "bg-green-50",
+  "green-pastel": "bg-green-50",
+  yellow: "bg-yellow-50",
+  "yellow-pastel": "bg-yellow-50",
+  orange: "bg-orange-50",
+  "orange-pastel": "bg-orange-50",
+  red: "bg-red-50",
+  "red-pastel": "bg-red-50",
+}

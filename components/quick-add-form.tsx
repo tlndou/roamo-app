@@ -35,7 +35,8 @@ export function QuickAddForm({ onSubmit }: QuickAddFormProps) {
       continent: "Europe",
       coordinates: { lat: 0, lng: 0 },
       comments: "Auto-extracted from link",
-      thumbnail: "",
+      useCustomImage: false,
+      iconColor: "grey",
       link: url,
     })
 

@@ -3,14 +3,18 @@
 import type React from "react"
 
 import { useState } from "react"
+import { Upload, Image as ImageIcon } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LocationAutocomplete } from "@/components/location-autocomplete"
-import type { Spot, SpotCategory } from "@/types/spot"
+import { IconColorPicker } from "@/components/icon-color-picker"
+import { categoryIcons, iconColorClasses, iconColorBgClasses } from "@/lib/category-icons"
+import type { Spot, SpotCategory, IconColor } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
+import { cn } from "@/lib/utils"
 
 interface ManualSpotFormProps {
   onSubmit: (spot: Spot) => void
@@ -39,9 +43,22 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     address: "",
     coordinates: { lat: 0, lng: 0 },
     comments: "",
-    thumbnail: "",
+    useCustomImage: false,
+    customImage: "",
+    iconColor: "grey" as IconColor,
     link: "",
   })
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFormData({ ...formData, customImage: reader.result as string, useCustomImage: true })
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleLocationSelect = (location: {
     city: string
@@ -144,15 +161,112 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="thumbnail">Photo URL (optional)</Label>
-        <Input
-          id="thumbnail"
-          type="url"
-          value={formData.thumbnail}
-          onChange={(e) => setFormData({ ...formData, thumbnail: e.target.value })}
-          placeholder="https://..."
-        />
+      <div className="space-y-4">
+        <Label>Icon or Image</Label>
+
+        {/* Toggle between icon and custom image */}
+        <div className="flex gap-2 rounded-lg border border-border p-1">
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, useCustomImage: false })}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              !formData.useCustomImage
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Category Icon
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, useCustomImage: true })}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              formData.useCustomImage
+                ? "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Custom Image
+          </button>
+        </div>
+
+        {/* Icon color picker */}
+        {!formData.useCustomImage && (
+          <div className="space-y-3">
+            <IconColorPicker value={formData.iconColor} onChange={(color) => setFormData({ ...formData, iconColor: color })} />
+
+            {/* Icon preview */}
+            <div className="flex items-center gap-3 rounded-lg border border-border p-4">
+              <div
+                className={cn(
+                  "flex h-16 w-16 items-center justify-center rounded-lg",
+                  iconColorBgClasses[formData.iconColor]
+                )}
+              >
+                {(() => {
+                  const Icon = categoryIcons[formData.category]
+                  return <Icon className={cn("h-8 w-8", iconColorClasses[formData.iconColor])} />
+                })()}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium">Preview</div>
+                <div className="text-xs text-muted-foreground">
+                  {formData.category.charAt(0).toUpperCase() + formData.category.slice(1)} icon
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Image upload */}
+        {formData.useCustomImage && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => document.getElementById("image-upload")?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Image
+              </Button>
+            </div>
+
+            {formData.customImage && (
+              <div className="relative overflow-hidden rounded-lg border border-border">
+                <img src={formData.customImage} alt="Preview" className="h-32 w-full object-cover" />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={() => setFormData({ ...formData, customImage: "" })}
+                >
+                  Remove
+                </Button>
+              </div>
+            )}
+
+            {!formData.customImage && (
+              <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50">
+                <div className="text-center">
+                  <ImageIcon className="mx-auto h-8 w-8 text-muted-foreground" />
+                  <p className="mt-2 text-xs text-muted-foreground">No image uploaded</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

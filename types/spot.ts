@@ -1,5 +1,22 @@
 export type SpotCategory = "restaurant" | "cafe" | "bar" | "museum" | "park" | "attraction" | "hotel" | "shop" | "other"
 
+export type IconColor =
+  | "grey"
+  | "pink"
+  | "pink-pastel"
+  | "purple"
+  | "purple-pastel"
+  | "blue"
+  | "blue-pastel"
+  | "green"
+  | "green-pastel"
+  | "yellow"
+  | "yellow-pastel"
+  | "orange"
+  | "orange-pastel"
+  | "red"
+  | "red-pastel"
+
 export interface Spot {
   id: string
   category: SpotCategory
@@ -9,7 +26,10 @@ export interface Spot {
   continent: string
   address?: string
   comments?: string
-  thumbnail?: string
+  // Icon/Image options
+  useCustomImage: boolean
+  customImage?: string // URL or base64 for uploaded image
+  iconColor: IconColor
   link?: string
   coordinates: {
     lat: number
