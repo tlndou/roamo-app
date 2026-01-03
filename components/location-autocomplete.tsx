@@ -154,7 +154,10 @@ export function LocationAutocomplete({
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
           <div className="max-h-[300px] overflow-y-auto p-1">
             {results.map((result, index) => {
-              const city = result.address.city || result.address.town || result.address.village
+              // Split display_name to show primary location and full address
+              const displayParts = result.display_name.split(", ")
+              const primaryName = displayParts[0] // e.g., "Eiffel Tower"
+              const secondaryInfo = displayParts.slice(1, 3).join(", ") // e.g., "Avenue Anatole France, 7th Arrondissement"
               const country = result.address.country
 
               return (
@@ -171,8 +174,12 @@ export function LocationAutocomplete({
                   <div className="flex items-start gap-2">
                     <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <div className="flex-1 overflow-hidden">
-                      <div className="font-medium">{city}</div>
-                      <div className="truncate text-xs text-muted-foreground">{country}</div>
+                      <div className="font-medium truncate">{primaryName}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {secondaryInfo}
+                        {secondaryInfo && country && " • "}
+                        {country}
+                      </div>
                     </div>
                   </div>
                 </button>
