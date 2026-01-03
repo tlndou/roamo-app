@@ -19,35 +19,37 @@ export function AddSpotDialog({ open, onOpenChange, onAddSpot }: AddSpotDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl font-medium">Add New Spot</DialogTitle>
         </DialogHeader>
 
-        {/* Mode Toggle */}
-        <div className="flex gap-2 rounded-lg bg-muted p-1">
-          <Button
-            variant={mode === "manual" ? "secondary" : "ghost"}
-            size="sm"
-            className="flex-1"
-            onClick={() => setMode("manual")}
-          >
-            Manual
-          </Button>
-          <Button
-            variant={mode === "quick" ? "secondary" : "ghost"}
-            size="sm"
-            className="flex-1 gap-2"
-            onClick={() => setMode("quick")}
-          >
-            <LinkIcon className="h-3.5 w-3.5" />
-            Quick Add
-          </Button>
-        </div>
+        <div className="flex-1 overflow-y-auto">
+          {/* Mode Toggle */}
+          <div className="flex gap-2 rounded-lg bg-muted p-1 mb-4">
+            <Button
+              variant={mode === "manual" ? "secondary" : "ghost"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setMode("manual")}
+            >
+              Manual
+            </Button>
+            <Button
+              variant={mode === "quick" ? "secondary" : "ghost"}
+              size="sm"
+              className="flex-1 gap-2"
+              onClick={() => setMode("quick")}
+            >
+              <LinkIcon className="h-3.5 w-3.5" />
+              Quick Add
+            </Button>
+          </div>
 
-        {/* Forms */}
-        <div className="mt-2">
-          {mode === "manual" ? <ManualSpotForm onSubmit={onAddSpot} /> : <QuickAddForm onSubmit={onAddSpot} />}
+          {/* Forms */}
+          <div>
+            {mode === "manual" ? <ManualSpotForm onSubmit={onAddSpot} /> : <QuickAddForm onSubmit={onAddSpot} />}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
