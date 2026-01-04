@@ -4,6 +4,7 @@ import { Geist } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/providers/auth-provider"
 import { Header } from "@/components/layout/header"
+import { OnboardingDialog } from "@/components/profile/onboarding-dialog"
 import { Toaster } from "sonner"
 import "./globals.css"
 
@@ -43,6 +44,7 @@ export default function RootLayout({
         <AuthProvider>
           <Header />
           {children}
+          <OnboardingDialog />
           <Toaster />
         </AuthProvider>
         <Analytics />

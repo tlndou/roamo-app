@@ -8,6 +8,9 @@ export interface Database {
           id: string
           email: string | null
           full_name: string | null
+          display_name: string | null
+          username: string | null
+          bio: string | null
           avatar_url: string | null
           created_at: string
           updated_at: string
@@ -16,11 +19,17 @@ export interface Database {
           id: string
           email?: string | null
           full_name?: string | null
+          display_name?: string | null
+          username?: string | null
+          bio?: string | null
           avatar_url?: string | null
         }
         Update: {
           email?: string | null
           full_name?: string | null
+          display_name?: string | null
+          username?: string | null
+          bio?: string | null
           avatar_url?: string | null
           updated_at?: string
         }

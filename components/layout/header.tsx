@@ -23,7 +23,7 @@ export function Header() {
             {loading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : user ? (
-              <UserMenu user={user} />
+              <UserMenu />
             ) : (
               <Button onClick={() => setShowAuthDialog(true)}>Sign In</Button>
             )}
