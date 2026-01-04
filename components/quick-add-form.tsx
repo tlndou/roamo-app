@@ -38,6 +38,7 @@ export function QuickAddForm({ onSubmit }: QuickAddFormProps) {
       useCustomImage: false,
       iconColor: "grey",
       link: url,
+      visited: false,
     })
 
     setIsLoading(false)

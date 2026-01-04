@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { ChevronRight, ExternalLink, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
 
@@ -16,6 +17,7 @@ interface NavigationState {
 interface ListViewProps {
   spots: Spot[]
   onDeleteSpot: (id: string) => void
+  onToggleVisited: (id: string, visited: boolean) => void
   navigation: NavigationState
   onNavigationChange: (nav: NavigationState) => void
 }
@@ -35,7 +37,7 @@ interface NavigationState {
   city?: string
 }
 
-export function ListView({ spots, onDeleteSpot, navigation, onNavigationChange }: ListViewProps) {
+export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onNavigationChange }: ListViewProps) {
 
   const groupedSpots = useMemo(() => {
     const grouped: GroupedSpots = {}
@@ -230,6 +232,14 @@ export function ListView({ spots, onDeleteSpot, navigation, onNavigationChange }
               key={spot.id}
               className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
             >
+              {/* Visited Checkbox */}
+              <div className="pt-1">
+                <Checkbox
+                  checked={spot.visited}
+                  onCheckedChange={(checked) => onToggleVisited(spot.id, checked as boolean)}
+                />
+              </div>
+
               {/* Icon or Image */}
               {spot.useCustomImage && spot.customImage ? (
                 <img

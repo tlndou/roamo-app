@@ -20,6 +20,7 @@ export function transformDbSpot(dbSpot: DbSpot): Spot {
     customImage: dbSpot.custom_image ?? undefined,
     iconColor: dbSpot.icon_color as Spot["iconColor"],
     link: dbSpot.link ?? undefined,
+    visited: dbSpot.visited,
     coordinates: {
       lat: Number(dbSpot.lat),
       lng: Number(dbSpot.lng),
@@ -44,6 +45,7 @@ export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
     link: spot.link ?? null,
     lat: spot.coordinates.lat,
     lng: spot.coordinates.lng,
+    visited: spot.visited,
   }
 }
 
@@ -69,6 +71,7 @@ export async function createSpot(spot: Omit<Spot, "id">): Promise<Spot> {
   const spotWithId = { ...spot, id: "temp" }
   const dbSpot = transformToDbSpot(spotWithId, user.id)
 
+  // @ts-expect-error - Supabase type inference issue with optional fields
   const { data, error } = await supabase.from("spots").insert(dbSpot).select().single()
 
   if (error) throw error
@@ -80,6 +83,15 @@ export async function deleteSpot(id: string): Promise<void> {
   const supabase = createClient()
 
   const { error } = await supabase.from("spots").delete().eq("id", id)
+
+  if (error) throw error
+}
+
+export async function toggleSpotVisited(id: string, visited: boolean): Promise<void> {
+  const supabase = createClient()
+
+  // @ts-ignore - Supabase type inference issue with update method
+  const { error } = await supabase.from("spots").update({ visited, updated_at: new Date().toISOString() }).eq("id", id)
 
   if (error) throw error
 }

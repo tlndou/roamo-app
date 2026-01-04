@@ -88,8 +88,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
       await updateProfile(user.id, {
         displayName: data.displayName,
         username: data.username,
-        bio: data.bio || null,
-        avatarUrl,
+        bio: data.bio || undefined,
+        avatarUrl: avatarUrl || undefined,
       })
 
       // Refresh profile data

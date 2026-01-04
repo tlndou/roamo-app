@@ -12,6 +12,8 @@ export interface Database {
           username: string | null
           bio: string | null
           avatar_url: string | null
+          birthdate: string | null
+          zodiac_sign: string | null
           created_at: string
           updated_at: string
         }
@@ -23,6 +25,8 @@ export interface Database {
           username?: string | null
           bio?: string | null
           avatar_url?: string | null
+          birthdate?: string | null
+          zodiac_sign?: string | null
         }
         Update: {
           email?: string | null
@@ -31,6 +35,8 @@ export interface Database {
           username?: string | null
           bio?: string | null
           avatar_url?: string | null
+          birthdate?: string | null
+          zodiac_sign?: string | null
           updated_at?: string
         }
       }
@@ -51,6 +57,7 @@ export interface Database {
           link: string | null
           lat: number
           lng: number
+          visited: boolean
           created_at: string
           updated_at: string
         }
@@ -69,6 +76,7 @@ export interface Database {
           link?: string | null
           lat: number
           lng: number
+          visited?: boolean
         }
         Update: {
           category?: string
@@ -84,6 +92,7 @@ export interface Database {
           link?: string | null
           lat?: number
           lng?: number
+          visited?: boolean
           updated_at?: string
         }
       }

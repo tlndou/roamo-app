@@ -31,6 +31,7 @@ export interface Spot {
   customImage?: string // URL or base64 for uploaded image
   iconColor: IconColor
   link?: string
+  visited: boolean
   coordinates: {
     lat: number
     lng: number

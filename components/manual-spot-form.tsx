@@ -50,6 +50,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     customImage: "",
     iconColor: "grey" as IconColor,
     link: "",
+    visited: false,
   })
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

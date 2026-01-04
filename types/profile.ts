@@ -5,6 +5,8 @@ export interface Profile {
   username: string
   bio: string | null
   avatarUrl: string | null
+  birthdate: string | null
+  zodiacSign: string | null
   createdAt: string
   updatedAt: string
 }
@@ -14,4 +16,6 @@ export interface ProfileUpdate {
   username?: string
   bio?: string
   avatarUrl?: string
+  birthdate?: string
+  zodiacSign?: string
 }

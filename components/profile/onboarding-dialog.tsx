@@ -36,6 +36,7 @@ export function OnboardingDialog() {
     defaultValues: {
       displayName: "",
       username: "",
+      birthdate: "",
       bio: "",
     },
   })
@@ -85,7 +86,8 @@ export function OnboardingDialog() {
       await updateProfile(user.id, {
         displayName: data.displayName,
         username: data.username,
-        bio: data.bio || null,
+        birthdate: data.birthdate,
+        bio: data.bio || undefined,
       })
 
       await refreshProfile()
@@ -157,6 +159,22 @@ export function OnboardingDialog() {
             <p className="text-xs text-muted-foreground">
               Lowercase letters, numbers, and underscores only. 3-20 characters.
             </p>
+          </div>
+
+          {/* Birthdate */}
+          <div className="space-y-2">
+            <Label htmlFor="birthdate">
+              Birthdate <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="birthdate"
+              type="date"
+              {...register("birthdate")}
+              max={new Date().toISOString().split("T")[0]}
+              className={errors.birthdate ? "border-destructive" : ""}
+            />
+            {errors.birthdate && <p className="text-sm text-destructive">{errors.birthdate.message}</p>}
+            <p className="text-xs text-muted-foreground">We'll use this to calculate your star sign</p>
           </div>
 
           {/* Submit Button */}

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import { calculateZodiacSign } from "@/lib/zodiac-utils"
 import type { Profile, ProfileUpdate } from "@/types/profile"
 import type { Database } from "@/types/supabase"
 
@@ -13,6 +14,8 @@ export function transformDbProfile(dbProfile: DbProfile): Profile {
     username: dbProfile.username || "",
     bio: dbProfile.bio,
     avatarUrl: dbProfile.avatar_url,
+    birthdate: dbProfile.birthdate,
+    zodiacSign: dbProfile.zodiac_sign,
     createdAt: dbProfile.created_at,
     updatedAt: dbProfile.updated_at,
   }
@@ -32,14 +35,23 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 export async function updateProfile(userId: string, updates: ProfileUpdate): Promise<Profile> {
   const supabase = createClient()
 
-  const dbUpdates = {
-    display_name: updates.displayName,
-    username: updates.username?.toLowerCase(),
-    bio: updates.bio,
-    avatar_url: updates.avatarUrl,
+  type DbProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"]
+  const dbUpdates: DbProfileUpdate = {
     updated_at: new Date().toISOString(),
   }
 
+  if (updates.displayName !== undefined) dbUpdates.display_name = updates.displayName
+  if (updates.username !== undefined) dbUpdates.username = updates.username.toLowerCase()
+  if (updates.bio !== undefined) dbUpdates.bio = updates.bio
+  if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl
+  if (updates.birthdate !== undefined) {
+    dbUpdates.birthdate = updates.birthdate
+    dbUpdates.zodiac_sign = calculateZodiacSign(updates.birthdate)
+  } else if (updates.zodiacSign !== undefined) {
+    dbUpdates.zodiac_sign = updates.zodiacSign
+  }
+
+  // @ts-expect-error - Supabase type inference issue with optional fields
   const { data, error } = await supabase.from("profiles").update(dbUpdates).eq("id", userId).select().single()
 
   if (error) throw error

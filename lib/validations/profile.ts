@@ -9,6 +9,15 @@ export const profileSchema = z.object({
     .max(20, "Username must be 20 characters or less")
     .regex(/^[a-z0-9_]+$/, "Username must be lowercase letters, numbers, or underscores"),
 
+  birthdate: z.string().refine(
+    (date) => {
+      const birthDate = new Date(date)
+      const today = new Date()
+      return birthDate < today
+    },
+    { message: "Birthdate must be in the past" }
+  ),
+
   bio: z.string().max(500, "Bio must be 500 characters or less").optional().nullable(),
 })
 

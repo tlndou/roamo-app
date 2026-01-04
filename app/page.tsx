@@ -10,7 +10,7 @@ import { ViewToggle } from "@/components/view-toggle"
 import { CategoryFilter } from "@/components/category-filter"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/components/providers/auth-provider"
-import { fetchSpots, createSpot, deleteSpot } from "@/lib/api/spots"
+import { fetchSpots, createSpot, deleteSpot, toggleSpotVisited } from "@/lib/api/spots"
 import { toast } from "sonner"
 import type { Spot } from "@/types/spot"
 
@@ -75,6 +75,17 @@ export default function Home() {
     }
   }
 
+  const handleToggleVisited = async (id: string, visited: boolean) => {
+    try {
+      await toggleSpotVisited(id, visited)
+      setSpots(spots.map((s) => (s.id === id ? { ...s, visited } : s)))
+      toast.success(visited ? "Marked as visited" : "Marked as not visited")
+    } catch (error) {
+      console.error("Error toggling visited:", error)
+      toast.error("Failed to update spot")
+    }
+  }
+
   const filteredSpots = selectedCategory === "all" ? spots : spots.filter((s) => s.category === selectedCategory)
 
   // Loading state
@@ -133,7 +144,7 @@ export default function Home() {
             <p className="text-sm text-muted-foreground">No spots added yet. Click "Add Spot" to get started.</p>
           </div>
         ) : view === "list" ? (
-          <ListView spots={filteredSpots} onDeleteSpot={handleDeleteSpot} navigation={navigation} onNavigationChange={setNavigation} />
+          <ListView spots={filteredSpots} onDeleteSpot={handleDeleteSpot} onToggleVisited={handleToggleVisited} navigation={navigation} onNavigationChange={setNavigation} />
         ) : (
           <MapView spots={filteredSpots} navigation={navigation} />
         )}
