@@ -23,6 +23,7 @@ interface NavigationState {
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth()
+  const userId = user?.id ?? null
   const [spots, setSpots] = useState<Spot[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -31,13 +32,15 @@ export default function Home() {
   const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
 
   useEffect(() => {
-    if (user) {
+    // Avoid reloading (and showing the full-page skeleton) when Supabase refreshes the session
+    // and the `user` object identity changes but the userId stays the same.
+    if (userId) {
       loadSpots()
     } else if (!authLoading) {
       setSpots([])
       setLoading(false)
     }
-  }, [user, authLoading])
+  }, [userId, authLoading])
 
   const loadSpots = async () => {
     try {

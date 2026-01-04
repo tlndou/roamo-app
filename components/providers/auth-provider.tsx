@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { fetchProfile } from "@/lib/api/profiles"
 import type { User } from "@supabase/supabase-js"
@@ -26,7 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
+  // IMPORTANT: create the Supabase client once.
+  // If we recreate it on every render, the auth subscriptions re-initialize repeatedly,
+  // which can cause brief loading flashes (and unmount UI like dialogs).
+  const supabase = useMemo(() => createClient(), [])
 
   const loadProfile = async (userId: string) => {
     try {
