@@ -22,7 +22,13 @@ export async function enrichSpotDraft(
     draft.name.includes("www") ||
     /[^\w\s\-',&.]/.test(draft.name) // Contains unusual characters
 
-  if (!needsEnrichment || !ANTHROPIC_API_KEY) {
+  if (!needsEnrichment) {
+    return draft
+  }
+
+  if (!ANTHROPIC_API_KEY) {
+    // Don't spam logs for every request; just enough to make missing config obvious.
+    console.warn("[ai-enrichment] Skipping Claude enrichment: ANTHROPIC_API_KEY is not set")
     return draft
   }
 

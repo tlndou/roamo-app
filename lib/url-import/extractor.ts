@@ -23,7 +23,8 @@ export class URLExtractor {
       ["tiktok", new SocialMediaExtractor()],
     ])
 
-    this.fallbackExtractor = new GenericWebsiteExtractor()
+    // Generic websites can optionally use Google Places search as a fallback when sites block scraping (403).
+    this.fallbackExtractor = new GenericWebsiteExtractor(googleApiKey)
   }
 
   async extractFromURL(urlString: string): Promise<URLImportResult> {

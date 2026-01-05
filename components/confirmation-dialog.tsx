@@ -21,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { IconColorPicker } from "@/components/icon-color-picker"
 import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
 import { cn } from "@/lib/utils"
+import { LocationAutocomplete } from "@/components/location-autocomplete"
+import { getCountryContinent } from "@/lib/country-utils"
 
 interface ConfirmationDialogProps {
   result: URLImportResult
@@ -35,6 +37,10 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const [editedDraft, setEditedDraft] = useState(result.draft)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const [locationSearch, setLocationSearch] = useState(() => {
+    const parts = [result.draft.address, result.draft.city, result.draft.country].filter(Boolean)
+    return parts.join(", ")
+  })
 
   const getConfidenceBadge = (confidence: string) => {
     const colors = {
@@ -123,47 +129,34 @@ export function ConfirmationDialog({
             />
           </div>
 
-          {/* Location (Manual form has location next) */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>City</Label>
-                {getConfidenceBadge(result.meta.confidence.city)}
-              </div>
-              <Input
-                value={editedDraft.city}
-                onChange={(e) =>
-                  setEditedDraft({ ...editedDraft, city: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Country</Label>
-                {getConfidenceBadge(result.meta.confidence.country)}
-              </div>
-              <Input
-                value={editedDraft.country}
-                onChange={(e) =>
-                  setEditedDraft({ ...editedDraft, country: e.target.value })
-                }
-              />
-            </div>
-          </div>
-
+          {/* Location (same UX as Manual Add) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Address</Label>
-              {getConfidenceBadge(result.meta.confidence.address)}
+              <Label>Location</Label>
+              {getConfidenceBadge(result.meta.confidence.coordinates)}
             </div>
-            <Input
-              value={editedDraft.address || ""}
-              onChange={(e) =>
-                setEditedDraft({ ...editedDraft, address: e.target.value })
-              }
-              placeholder="Enter address"
+            <LocationAutocomplete
+              value={locationSearch}
+              onChange={setLocationSearch}
+              onLocationSelect={(location) => {
+                const continent = getCountryContinent(location.country)
+                setEditedDraft({
+                  ...editedDraft,
+                  city: location.city || editedDraft.city,
+                  country: location.country || editedDraft.country,
+                  continent,
+                  address: location.address || editedDraft.address,
+                  coordinates: location.coordinates,
+                })
+              }}
+              placeholder="Search for a city or address..."
+              required
             />
+            {editedDraft.city && editedDraft.country && (
+              <p className="text-xs text-muted-foreground">
+                Selected: {editedDraft.city}, {editedDraft.country} ({editedDraft.continent})
+              </p>
+            )}
           </div>
 
           {/* Comments (maps to Spot.comments) */}
