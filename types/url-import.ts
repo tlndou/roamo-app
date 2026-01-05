@@ -2,6 +2,36 @@ import { SpotCategory, IconColor } from "./spot"
 
 export type ConfidenceLevel = "high" | "medium" | "low"
 
+export interface AISuggestedField<T> {
+  value: T | null
+  confidence: number // 0..1
+  evidence: string[]
+}
+
+export interface AISuggestions {
+  name?: AISuggestedField<string>
+  category?: AISuggestedField<SpotCategory>
+  city?: AISuggestedField<string>
+  country?: AISuggestedField<string>
+}
+
+export interface ImportSignals {
+  provider?: string
+  url?: string
+  resolvedUrl?: string
+  domain?: string
+  tld?: string
+  urlTokens?: string[]
+  detectedPostcodes?: string[]
+  jsonLdTypes?: string[]
+  openGraph?: Record<string, string>
+  googleTypes?: string[]
+  tripContext?: {
+    city?: string
+    country?: string
+  }
+}
+
 export interface FieldConfidence {
   name: ConfidenceLevel
   address: ConfidenceLevel
@@ -21,6 +51,17 @@ export interface ExtractionMetadata {
   warnings: string[]
   rawUrl: string
   resolvedUrl: string
+  flags?: {
+    location_conflict?: boolean
+    multi_location_brand?: boolean
+    insufficient_signals?: boolean
+  }
+  signals?: ImportSignals
+  ai?: {
+    model: string
+    suggestions: AISuggestions
+    applied: Partial<Record<keyof AISuggestions, boolean>>
+  }
 }
 
 export interface SpotDraft {

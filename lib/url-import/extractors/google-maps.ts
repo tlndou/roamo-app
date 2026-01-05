@@ -251,6 +251,9 @@ export class GoogleMapsExtractor implements ProviderExtractor {
         warnings: requiresConfirmation
           ? ["Place details were found via search; please confirm they match the intended spot."]
           : [],
+        signals: {
+          googleTypes: Array.isArray(place.types) ? place.types : [],
+        },
         rawUrl: url.toString(),
         resolvedUrl: url.toString(),
       },

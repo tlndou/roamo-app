@@ -1,6 +1,7 @@
 import { URLImportResult } from "@/types/url-import"
 import { ProviderExtractor } from "@/types/providers"
 import { getCountryContinent, normalizeCountryName } from "@/lib/country-utils"
+import type { SpotCategory } from "@/types/spot"
 
 export class GenericWebsiteExtractor implements ProviderExtractor {
   private googleApiKey?: string
@@ -21,6 +22,13 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
     const continent =
       rawCountry !== "Unknown" ? getCountryContinent(rawCountry) : "Unknown"
 
+    const categoryFromUrl = this.inferCategoryFromUrl(url)
+    const categoryFromSemantics = this.inferCategoryFromPageSemantics(metadata.title, metadata.description)
+    const category = categoryFromUrl ?? categoryFromSemantics ?? "other"
+
+    const isPlaces = String(metadata.method || "").includes("places")
+    const isJsonLd = String(metadata.method || "").includes("json_ld")
+
     return {
       draft: {
         name: metadata.title || url.hostname,
@@ -29,7 +37,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         country,
         continent,
         coordinates: metadata.coordinates || { lat: 0, lng: 0 },
-        category: "other",
+        category,
         link: url.toString(),
         comments: metadata.description,
         useCustomImage: false,
@@ -41,17 +49,24 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         method: metadata.method,
         confidence: {
           name: metadata.title ? "medium" : "low",
-          address: metadata.address ? "medium" : "low",
-          coordinates: metadata.coordinates ? "medium" : "low",
-          city: metadata.city ? "medium" : "low",
-          country: metadata.country ? "medium" : "low",
-          continent: metadata.country ? "medium" : "low",
-          category: "low",
+          // Never treat a "complete-looking" address (postcode + city) as high confidence.
+          // Elevate only when it comes from Places or JSON-LD.
+          address: metadata.address ? (isPlaces || isJsonLd ? "high" : "low") : "low",
+          coordinates: metadata.coordinates ? (isPlaces || isJsonLd ? "high" : "low") : "low",
+          city: metadata.city ? (isPlaces || isJsonLd ? "high" : "low") : "low",
+          country: metadata.country ? (isPlaces || isJsonLd ? "high" : "low") : "low",
+          continent: metadata.country ? (isPlaces || isJsonLd ? "high" : "low") : "low",
+          category: categoryFromUrl ? "high" : categoryFromSemantics ? "medium" : "low",
           link: "high",
         },
         // Always require confirmation for generic websites since data is unreliable
         requiresConfirmation: true,
         warnings: metadata.warnings,
+        flags: metadata.flags,
+        signals: {
+          ...(metadata.jsonLdTypes ? { jsonLdTypes: metadata.jsonLdTypes as string[] } : {}),
+          ...(metadata.openGraph ? { openGraph: metadata.openGraph as Record<string, string> } : {}),
+        },
         rawUrl: url.toString(),
         resolvedUrl: url.toString(),
       },
@@ -130,7 +145,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
       .join(" ")
   }
 
-  private async placesSearchText(query: string): Promise<any | null> {
+  private async placesSearchText(query: string): Promise<any[] | null> {
     if (!this.googleApiKey) return null
     const url = "https://places.googleapis.com/v1/places:searchText"
     const fieldMask = [
@@ -149,13 +164,15 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         "X-Goog-Api-Key": this.googleApiKey,
         "X-Goog-FieldMask": fieldMask,
       },
-      body: JSON.stringify({ textQuery: query, maxResultCount: 1 }),
+      body: JSON.stringify({ textQuery: query, maxResultCount: 5 }),
     })
 
     const data = await response.json().catch(() => ({}))
     if (!response.ok) return null
-    const place = Array.isArray((data as any).places) ? (data as any).places[0] : undefined
-    return place ?? null
+    const places = Array.isArray((data as any).places) ? (data as any).places : []
+    if (places.length === 0) return null
+    // Caller will choose a best match.
+    return places
   }
 
   private extractCityFromPlace(place: any): string | undefined {
@@ -187,8 +204,11 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         // Some sites (e.g., Marriott) block automated fetching with 403.
         // In that case: derive a best-effort title from URL and optionally use Google Places search.
         const derivedTitle = this.titleFromUrl(url)
-        const place = derivedTitle ? await this.placesSearchText(derivedTitle) : null
-        if (place) {
+        const signals = this.buildSoftLocationSignals(url, derivedTitle)
+        const places = derivedTitle ? await this.placesSearchText(this.buildPlacesQuery(derivedTitle, signals)) : null
+        const selection = Array.isArray(places) ? this.selectPlaceCandidate(places, signals) : null
+        if (selection?.place) {
+          const place = selection.place
           const country = this.extractCountryFromPlace(place)
           const city = this.extractCityFromPlace(place)
           return {
@@ -202,8 +222,10 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
                 : undefined,
             description: undefined,
             method: "places_search_text",
+            flags: selection.flags,
             warnings: [
               `Website blocked automated fetching (HTTP ${response.status}); used Google Places search — please confirm details`,
+              ...selection.warnings,
             ],
           }
         }
@@ -222,28 +244,148 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
       const jsonLd = this.extractJsonLd(html, url)
       if (jsonLd && jsonLd.title) {
         console.log(`[Generic Website] Found JSON-LD data: ${jsonLd.title}`)
-        return { ...jsonLd, method: "json_ld", warnings: [] }
+        const signals = this.buildSoftLocationSignals(url, jsonLd.title)
+        // If JSON-LD exists but lacks a reliable location, we can optionally use Places to fill gaps.
+        const needsPlaces =
+          this.googleApiKey &&
+          (!jsonLd.address || !jsonLd.city || !jsonLd.country || !jsonLd.coordinates) &&
+          Boolean(jsonLd.title)
+
+        if (needsPlaces) {
+          const places = await this.placesSearchText(this.buildPlacesQuery(jsonLd.title, signals))
+          const selection = Array.isArray(places) ? this.selectPlaceCandidate(places, signals) : null
+          if (selection?.place) {
+            const place = selection.place
+            return {
+              title: jsonLd.title,
+              address: place.formattedAddress,
+              city: this.extractCityFromPlace(place) ?? jsonLd.city,
+              country: this.extractCountryFromPlace(place) ?? jsonLd.country,
+              coordinates:
+                place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
+                  ? { lat: place.location.latitude, lng: place.location.longitude }
+                  : jsonLd.coordinates,
+              description: jsonLd.description,
+              method: "json_ld+places_search_text",
+              flags: selection.flags,
+              warnings: [
+                "Filled missing location details via Google Places search; please confirm details.",
+                ...selection.warnings,
+              ],
+              jsonLdTypes: jsonLd.jsonLdTypes,
+            }
+          }
+        }
+
+        return { ...jsonLd, method: "json_ld", warnings: [], jsonLdTypes: jsonLd.jsonLdTypes }
       }
 
       // Fallback to OpenGraph
       const og = this.extractOpenGraph(html, url)
       console.log(`[Generic Website] OpenGraph extraction: ${og.title || 'No title found'}`)
 
-      // Heuristic address extraction from visible text when no JSON-LD address exists.
-      const heuristic = this.extractAddressHeuristics(html)
-
       // Title fallback: if OG/meta title is missing or generic, try H1, then URL-derived title.
       const h1 = this.extractFirstH1(html)
       const title = og.title || (h1 ? this.cleanTitle(h1, url) : undefined) || this.titleFromUrl(url)
+
+      // Build signals AFTER we know the best title — important for sites like louvre.fr/en where the URL path is generic.
+      const signals = this.buildSoftLocationSignals(url, title)
+
+      // Heuristic address extraction from visible text when no JSON-LD address exists.
+      const heuristic = this.extractAddressHeuristics(html, signals.tokens)
+      const heuristicWarnings: string[] = []
+      if ((heuristic as any)?._ambiguous === true) {
+        heuristicWarnings.push(
+          "This page appears to list multiple locations/addresses. Roamo couldn’t confidently pick the right branch from the page content."
+        )
+      }
+
+      // If URL/title includes branch-like tokens (e.g. "mayfair") but extracted location doesn't reflect them,
+      // treat this as a contradiction and avoid accepting the heuristic address/city as truth.
+      const contradiction =
+        signals.tokens.length > 0 &&
+        title &&
+        this.hasTokenSignal(title, signals.tokens) &&
+        this.locationMismatch({ address: heuristic.address, city: heuristic.city }, signals.tokens)
+
+      if (contradiction) {
+        ;(heuristic as any)._ambiguous = true
+        heuristicWarnings.push(
+          "This place likely has multiple branches (URL implies a specific area). Please confirm the correct location."
+        )
+      }
+
+      // If we still don't have a confident location, try Places search with URL tokens as disambiguation.
+      const missingLocation =
+        this.googleApiKey &&
+        title &&
+        (
+          !heuristic.address ||
+          !heuristic.city ||
+          !heuristic.country ||
+          (heuristic as any)?._ambiguous === true
+        )
+
+      if (missingLocation && title) {
+        const places = await this.placesSearchText(this.buildPlacesQuery(title, signals))
+        const selection = Array.isArray(places) ? this.selectPlaceCandidate(places, signals) : null
+        if (selection?.place) {
+          const place = selection.place
+          const country = this.extractCountryFromPlace(place)
+          const city = this.extractCityFromPlace(place)
+          return {
+            ...og,
+            title,
+            address: place.formattedAddress,
+            city,
+            country,
+            coordinates:
+              place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
+                ? { lat: place.location.latitude, lng: place.location.longitude }
+                : undefined,
+            description: og.description,
+            method: "opengraph+places_search_text",
+            warnings: [
+              "Location details were filled via Google Places search; please confirm details (multi-location brands may match a different branch).",
+              ...heuristicWarnings,
+              ...selection.warnings,
+            ],
+            flags: selection.flags,
+          }
+        }
+
+        // Places search couldn't confidently disambiguate — don't guess.
+        if ((heuristic as any)?._ambiguous === true) {
+          return {
+            ...og,
+            title,
+            method: "opengraph",
+            warnings: [
+              ...heuristicWarnings,
+              "Could not confidently match a specific branch. Please select the correct location manually.",
+            ],
+            flags: {
+              ...(contradiction ? { location_conflict: true } : {}),
+              multi_location_brand: true,
+            },
+            openGraph: og.openGraph,
+          }
+        }
+      }
 
       return {
         ...og,
         title,
         ...heuristic,
         method: "opengraph",
-        warnings: og.title
+        warnings: [
+          ...(og.title
           ? ["Limited structured data available from website — please confirm details"]
-          : ["Could not extract meaningful data from website — please confirm details"],
+          : ["Could not extract meaningful data from website — please confirm details"]),
+          ...heuristicWarnings,
+        ],
+        flags: contradiction ? { location_conflict: true } : undefined,
+        openGraph: og.openGraph,
       }
     } catch (error) {
       console.error(`[Generic Website] Extraction failed:`, error)
@@ -345,6 +487,13 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
 
     const title = this.cleanTitle(best.name, url) ?? this.cleanTitle(best.headline, url) ?? undefined
 
+    const rawTypes = best?.["@type"]
+    const jsonLdTypes = Array.isArray(rawTypes)
+      ? rawTypes.map((t: any) => String(t))
+      : rawTypes
+        ? [String(rawTypes)]
+        : []
+
     return {
       title,
       address: addressLine ? this.decodeHtmlEntities(addressLine) : undefined,
@@ -355,6 +504,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
           ? coords
           : undefined,
       description: best.description ? this.stripTags(String(best.description)) : undefined,
+      jsonLdTypes,
     }
   }
 
@@ -380,10 +530,20 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
       title: this.cleanTitle(title?.trim(), url),
       description: description ? this.decodeHtmlEntities(description.trim()) : undefined,
       image: ogImageMatch?.[1] ? this.decodeHtmlEntities(ogImageMatch[1].trim()) : undefined,
+      openGraph: {
+        ...(ogTitleMatch?.[1] ? { "og:title": this.decodeHtmlEntities(ogTitleMatch[1].trim()) } : {}),
+        ...(ogDescMatch?.[1] ? { "og:description": this.decodeHtmlEntities(ogDescMatch[1].trim()) } : {}),
+        ...(ogImageMatch?.[1] ? { "og:image": this.decodeHtmlEntities(ogImageMatch[1].trim()) } : {}),
+        ...(metaTitleMatch?.[1] ? { "meta:title": this.decodeHtmlEntities(metaTitleMatch[1].trim()) } : {}),
+        ...(metaDescMatch?.[1] ? { "meta:description": this.decodeHtmlEntities(metaDescMatch[1].trim()) } : {}),
+      },
     }
   }
 
-  private extractAddressHeuristics(html: string): {
+  private extractAddressHeuristics(
+    html: string,
+    preferTokens: string[]
+  ): {
     address?: string
     city?: string
     country?: string
@@ -392,16 +552,36 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
     // Very lightweight heuristics for sites without JSON-LD.
     const text = this.stripTags(html)
 
-    // UK postcode pattern (captures a likely address line).
-    const uk = text.match(
-      /(\d{1,5}\s+[A-Za-z0-9 .'\-]+,\s*[A-Za-z .'\-]+,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})/i
-    )
-    if (uk?.[1]) {
-      const addr = uk[1].trim()
-      const parts = addr.split(",").map((x) => x.trim())
+    const windowMatchesTokens = (idx: number) => {
+      if (!preferTokens.length) return 0
+      const start = Math.max(0, idx - 200)
+      const end = Math.min(text.length, idx + 200)
+      const window = text.slice(start, end).toLowerCase()
+      let score = 0
+      for (const t of preferTokens) {
+        if (t.length >= 3 && window.includes(t.toLowerCase())) score++
+      }
+      return score
+    }
+
+    // UK postcode pattern (captures likely address lines). We intentionally do NOT take the first match
+    // because multi-location brands often list many addresses on one page.
+    const ukRe = /(\d{1,5}\s+[A-Za-z0-9 .'\-]+,\s*[A-Za-z .'\-]+,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})/gi
+    const ukMatches = [...text.matchAll(ukRe)].slice(0, 8)
+    if (ukMatches.length > 0) {
+      const scored = ukMatches
+        .map((m) => ({ addr: m[1].trim(), idx: m.index ?? 0, score: windowMatchesTokens(m.index ?? 0) }))
+        .sort((a, b) => b.score - a.score)
+
+      // If we have multiple addresses and none align with the URL location tokens, don't guess.
+      if (ukMatches.length > 1 && scored[0].score === 0) {
+        return { _ambiguous: true } as any
+      }
+
+      const best = scored[0]
+      const parts = best.addr.split(",").map((x) => x.trim())
       const city = parts.length >= 2 ? parts[parts.length - 2] : undefined
-      // The presence of a UK postcode is a strong signal for country.
-      return { address: addr, city, country: "United Kingdom" }
+      return { address: best.addr, city, country: "United Kingdom" }
     }
 
     // US pattern: "123 Main St, City, ST 12345"
@@ -421,5 +601,212 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
     }
 
     return {}
+  }
+
+  private hasTokenSignal(text: string, tokens: string[]): boolean {
+    const hay = text.toLowerCase()
+    return tokens.some((t) => t.length >= 3 && hay.includes(t.toLowerCase()))
+  }
+
+  private locationMismatch(
+    location: { address?: string; city?: string },
+    preferTokens: string[]
+  ): boolean {
+    if (preferTokens.length === 0) return false
+    const hay = `${location.city ?? ""} ${location.address ?? ""}`.toLowerCase()
+    // If we have a concrete city/address but it contains none of the expanded tokens,
+    // treat it as a mismatch (likely wrong branch for multi-location brands).
+    const hasAny = preferTokens.some((t) => t.length >= 3 && hay.includes(t.toLowerCase()))
+    const hasConcrete = Boolean((location.city && location.city.toLowerCase() !== "unknown") || location.address)
+    return hasConcrete && !hasAny
+  }
+
+  private inferCategoryFromUrl(url: URL): SpotCategory | null {
+    const p = url.pathname.toLowerCase()
+    if (p.includes("/restaurants") || p.includes("/restaurant") || p.includes("/dining") || p.includes("/menu")) return "restaurant"
+    if (p.includes("/cafes") || p.includes("/cafe")) return "cafe"
+    if (p.includes("/bars") || p.includes("/bar")) return "bar"
+    if (p.includes("/hotels") || p.includes("/hotel")) return "hotel"
+    if (p.includes("/museums") || p.includes("/museum")) return "museum"
+    if (p.includes("/parks") || p.includes("/park")) return "park"
+    if (p.includes("/attractions") || p.includes("/attraction")) return "attraction"
+    if (p.includes("/activities") || p.includes("/activity")) return "activity"
+    if (p.includes("/events") || p.includes("/event")) return "event"
+    if (p.includes("/shops") || p.includes("/shop")) return "shop"
+    return null
+  }
+
+  private inferCategoryFromPageSemantics(title?: string, description?: string): SpotCategory | null {
+    const t = `${title ?? ""} ${description ?? ""}`.toLowerCase()
+    if (!t.trim()) return null
+    // Strong, explicit signals
+    if (/\bmuseum\b/.test(t) || /\bmusée\b/.test(t)) return "museum"
+    if (/\bpark\b/.test(t) || /\bgarden\b/.test(t)) return "park"
+    if (/\bhotel\b/.test(t) || /\brooms\b/.test(t) || /\bcheck-?in\b/.test(t)) return "hotel"
+    if (/\bmenu\b/.test(t) || /\brestaurant\b/.test(t) || /\bdining\b/.test(t)) return "restaurant"
+    if (/\bcafe\b/.test(t) || /\bcoffee\b/.test(t)) return "cafe"
+    if (/\bbar\b/.test(t) || /\bcocktail\b/.test(t)) return "bar"
+    if (/\bshop\b/.test(t) || /\bstore\b/.test(t) || /\bbuy\b/.test(t)) return "shop"
+    if (/\btickets\b/.test(t) || /\bbook a ticket\b/.test(t)) return "attraction"
+    return null
+  }
+
+  private extractLocationTokensFromUrl(url: URL): string[] {
+    const rawSegments = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .slice(0, 10)
+      .flatMap((seg) => seg.split("?")[0].split("#")[0].split(/[-_]+/g))
+      .map((s) => decodeURIComponent(s).toLowerCase().trim())
+      .filter(Boolean)
+
+    const stop = new Set([
+      "the",
+      "and",
+      "or",
+      "a",
+      "an",
+      "of",
+      "to",
+      "in",
+      "on",
+      "for",
+      "en",
+      "en-us",
+      "fr",
+      "de",
+      "it",
+      "es",
+      "pt",
+      "restaurants",
+      "restaurant",
+      "locations",
+      "location",
+      "overview",
+      "home",
+    ])
+
+    // Prefer the last meaningful segment tokens (often the branch slug), but keep a few others.
+    const filtered = rawSegments.filter((t) => t.length >= 3 && !stop.has(t))
+    const lastSeg = url.pathname.split("/").filter(Boolean).pop() ?? ""
+    const lastTokens = lastSeg
+      .split(/[-_]+/g)
+      .map((t) => decodeURIComponent(t).toLowerCase().trim())
+      .filter((t) => t.length >= 3 && !stop.has(t))
+
+    const combined = [...new Set([...lastTokens, ...filtered])].slice(0, 10)
+    return combined
+  }
+
+  private buildPlacesQuery(baseTitle: string, signals: { tokens: string[] }): string {
+    // Branch-aware query: append URL/title-derived tokens to disambiguate multi-location brands.
+    const tokenStr = signals.tokens.length ? ` ${signals.tokens.join(" ")}` : ""
+    return `${baseTitle}${tokenStr}`.trim()
+  }
+
+  private buildSoftLocationSignals(url: URL, title?: string): { tokens: string[]; domainTokens: string[] } {
+    const urlTokens = this.extractLocationTokensFromUrl(url)
+    const titleTokens =
+      title
+        ? title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, " ")
+            .split(/\s+/)
+            .map((t) => t.trim())
+            .filter((t) => t.length >= 3)
+            .slice(0, 12)
+        : []
+
+    const domain = url.hostname.replace(/^www\./, "").toLowerCase()
+    const domainTokens = domain.split(".").flatMap((p) => p.split(/[-_]/g)).filter((t) => t.length >= 3)
+
+    const stop = new Set([
+      "the",
+      "and",
+      "for",
+      "with",
+      "from",
+      "restaurant",
+      "restaurants",
+      "dining",
+      "menu",
+      "home",
+      "homepage",
+      "overview",
+      "book",
+      "booking",
+      "tickets",
+      "ticket",
+      "location",
+      "locations",
+      "contact",
+    ])
+
+    const combined = [...new Set([...urlTokens, ...titleTokens])]
+      .filter((t) => !stop.has(t))
+      .slice(0, 10)
+
+    return { tokens: combined, domainTokens }
+  }
+
+  private selectPlaceCandidate(
+    places: any[],
+    signals: { tokens: string[]; domainTokens: string[] }
+  ): { place: any | null; flags: any; warnings: string[] } {
+    const flags: any = {}
+    const warnings: string[] = []
+    if (!Array.isArray(places) || places.length === 0) {
+      flags.insufficient_signals = true
+      return { place: null, flags, warnings }
+    }
+
+    if (!signals.tokens.length) {
+      // Without any tokens, choosing a branch is risky for global multi-location brands.
+      flags.insufficient_signals = true
+      warnings.push("Not enough location signals in URL/title to confidently choose a branch from Places results.")
+      return { place: null, flags, warnings }
+    }
+
+    const tokens = signals.tokens.map((t) => t.toLowerCase())
+    const domainTokens = new Set(signals.domainTokens.map((t) => t.toLowerCase()))
+
+    const weight = (t: string) => (domainTokens.has(t) ? 1 : 3)
+
+    const scorePlace = (p: any) => {
+      const hay = `${p?.displayName?.text ?? ""} ${p?.formattedAddress ?? ""}`.toLowerCase()
+      let score = 0
+      for (const t of tokens) {
+        if (hay.includes(t)) score += weight(t)
+      }
+      return score
+    }
+
+    const ranked = places
+      .map((p) => ({ p, s: scorePlace(p) }))
+      .sort((a, b) => b.s - a.s)
+
+    const top = ranked[0]
+    const second = ranked[1]
+
+    if (!top || top.s === 0) {
+      flags.insufficient_signals = true
+      warnings.push("Places results did not align with URL/title signals; location was not auto-filled.")
+      return { place: null, flags, warnings }
+    }
+
+    const tied = ranked.filter((r) => r.s === top.s)
+    if (tied.length > 1) {
+      flags.multi_location_brand = true
+      warnings.push("Multiple Places results matched equally well; please confirm the correct branch.")
+      return { place: null, flags, warnings }
+    }
+
+    if (second && top.s - second.s < 2) {
+      flags.multi_location_brand = true
+      warnings.push("Places results were ambiguous; please confirm the correct branch.")
+      return { place: null, flags, warnings }
+    }
+
+    return { place: top.p, flags, warnings }
   }
 }
