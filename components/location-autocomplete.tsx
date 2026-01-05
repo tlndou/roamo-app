@@ -49,6 +49,7 @@ export function LocationAutocomplete({
   const [results, setResults] = useState<LocationResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -65,6 +66,13 @@ export function LocationAutocomplete({
 
   // Debounced search
   useEffect(() => {
+    // Only search when the input is focused. This prevents "auto searching" / dropdown
+    // flashes when the component mounts with a pre-filled value (e.g. in edit dialogs).
+    if (!isFocused) {
+      setShowResults(false)
+      return
+    }
+
     if (!value || value.length < 3) {
       setResults([])
       return
@@ -105,7 +113,7 @@ export function LocationAutocomplete({
         clearTimeout(debounceRef.current)
       }
     }
-  }, [value])
+  }, [value, isFocused])
 
   const handleSelect = (result: LocationResult) => {
     const city = result.address.city || result.address.town || result.address.village || ""
@@ -144,6 +152,8 @@ export function LocationAutocomplete({
           placeholder={placeholder}
           required={required}
           className="pl-9"
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
         />
         {isLoading && (
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />

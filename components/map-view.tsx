@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useEffect, useState } from "react"
+import { useMemo, useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { MapPin } from "lucide-react"
 import type { Spot } from "@/types/spot"
@@ -22,6 +22,7 @@ interface NavigationState {
 interface MapViewProps {
   spots: Spot[]
   navigation?: NavigationState
+  onSpotClick?: (spot: Spot) => void
 }
 
 // Fix for default marker icons in Leaflet
@@ -60,11 +61,9 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const L = require("leaflet")
-
     // Leaflet commonly needs a resize invalidation when its container becomes visible (e.g. switching tabs/views).
     // This helps avoid "blank/solid" map tiles until interaction.
-    setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       try {
         map.invalidateSize()
       } catch {
@@ -102,14 +101,19 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
       // No spots for the current navigation filter: reset to world view.
       map.setView([20, 0], 2)
     }
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [spots, navigation, map])
 
   return null
 }
 
-export function MapView({ spots, navigation }: MapViewProps) {
+export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
   const [mapKey, setMapKey] = useState(0)
+  const mapRef = useRef<any>(null)
 
   useEffect(() => {
     setIsMounted(true)
@@ -122,6 +126,28 @@ export function MapView({ spots, navigation }: MapViewProps) {
     if (!isMounted) return
     setMapKey((k) => k + 1)
   }, [isMounted, navigation?.continent, navigation?.country, navigation?.city])
+
+  // Defensive cleanup: in dev/HMR/StrictMode Leaflet can leave a stale map instance on the same container.
+  // Explicitly remove the map and clear Leaflet's internal container id to prevent "Map container is being reused".
+  useEffect(() => {
+    return () => {
+      const map = mapRef.current
+      if (!map) return
+      try {
+        map.off?.()
+        map.remove?.()
+        const container = map.getContainer?.()
+        if (container) {
+          // Leaflet uses this marker to detect reuse.
+          ;(container as any)._leaflet_id = null
+        }
+      } catch {
+        // ignore
+      } finally {
+        mapRef.current = null
+      }
+    }
+  }, [mapKey])
 
   const visibleSpots = useMemo(() => {
     if (!navigation) return spots
@@ -149,7 +175,13 @@ export function MapView({ spots, navigation }: MapViewProps) {
   const citySpotCounts = useMemo(() => {
     const counts: Record<
       string,
-      { count: number; coords: { lat: number; lng: number }; cityName: string; spots: Spot[] }
+      {
+        count: number
+        coords: { lat: number; lng: number }
+        cityName: string
+        spots: Spot[]
+        categorySummary: string
+      }
     > = {}
 
     visibleSpotsWithCoords.forEach((spot) => {
@@ -160,11 +192,26 @@ export function MapView({ spots, navigation }: MapViewProps) {
           coords: spot.coordinates,
           cityName: key,
           spots: [],
+          categorySummary: "",
         }
       }
       counts[key].count++
       counts[key].spots.push(spot)
     })
+
+    // Build a category summary for each city marker
+    for (const key of Object.keys(counts)) {
+      const byCategory = counts[key].spots.reduce((acc, s) => {
+        acc[s.category] = (acc[s.category] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+
+      const parts = Object.entries(byCategory).map(([cat, n]) => {
+        const label = cat.charAt(0).toUpperCase() + cat.slice(1)
+        return n === 1 ? label : `${label} (${n})`
+      })
+      counts[key].categorySummary = parts.join(", ")
+    }
 
     return counts
   }, [visibleSpotsWithCoords])
@@ -205,6 +252,9 @@ export function MapView({ spots, navigation }: MapViewProps) {
           minZoom={2}
           maxZoom={18}
           scrollWheelZoom={true}
+          whenCreated={(map) => {
+            mapRef.current = map
+          }}
           maxBounds={[
             [-90, -180],
             [90, 180],
@@ -227,14 +277,17 @@ export function MapView({ spots, navigation }: MapViewProps) {
               <Popup>
                 <div className="min-w-[200px]">
                   <h4 className="mb-2 font-semibold">{data.cityName}</h4>
-                  <p className="mb-2 text-sm text-muted-foreground">
-                    {data.count} {data.count === 1 ? "spot" : "spots"}
-                  </p>
+                  <p className="mb-2 text-sm text-muted-foreground">{data.categorySummary}</p>
                   <div className="space-y-1">
                     {data.spots.map((spot) => (
-                      <div key={spot.id} className="text-sm">
+                      <button
+                        key={spot.id}
+                        type="button"
+                        className="block w-full text-left text-sm hover:underline"
+                        onClick={() => onSpotClick?.(spot)}
+                      >
                         • {spot.name}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>

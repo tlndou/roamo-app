@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
+import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
+import { cn } from "@/lib/utils"
 
 interface NavigationState {
   level: "continent" | "country" | "city" | "spots"
@@ -20,6 +22,7 @@ interface ListViewProps {
   onToggleVisited: (id: string, visited: boolean) => void
   navigation: NavigationState
   onNavigationChange: (nav: NavigationState) => void
+  onSpotClick: (spot: Spot) => void
 }
 
 interface GroupedSpots {
@@ -37,7 +40,7 @@ interface NavigationState {
   city?: string
 }
 
-export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onNavigationChange }: ListViewProps) {
+export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onNavigationChange, onSpotClick }: ListViewProps) {
 
   const groupedSpots = useMemo(() => {
     const grouped: GroupedSpots = {}
@@ -231,12 +234,19 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
             <div
               key={spot.id}
               className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
+              role="button"
+              tabIndex={0}
+              onClick={() => onSpotClick(spot)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onSpotClick(spot)
+              }}
             >
               {/* Visited Checkbox */}
               <div className="pt-1">
                 <Checkbox
                   checked={spot.visited}
                   onCheckedChange={(checked) => onToggleVisited(spot.id, checked as boolean)}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -248,8 +258,16 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
                   className="h-16 w-16 rounded-md object-cover"
                 />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
-                  {spot.category.slice(0, 3).toUpperCase()}
+                <div
+                  className={cn(
+                    "flex h-16 w-16 items-center justify-center rounded-md",
+                    iconColorBgClasses[spot.iconColor]
+                  )}
+                >
+                  {(() => {
+                    const Icon = categoryIcons[spot.category]
+                    return <Icon className={cn("h-7 w-7", iconColorClasses[spot.iconColor])} />
+                  })()}
                 </div>
               )}
 
@@ -265,7 +283,7 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
 
                   <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     {spot.link && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" asChild>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" asChild onClick={(e) => e.stopPropagation()}>
                         <a href={spot.link} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
@@ -275,7 +293,10 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 text-destructive"
-                      onClick={() => onDeleteSpot(spot.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDeleteSpot(spot.id)
+                      }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

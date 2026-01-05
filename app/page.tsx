@@ -10,9 +10,10 @@ import { ViewToggle } from "@/components/view-toggle"
 import { CategoryFilter } from "@/components/category-filter"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/components/providers/auth-provider"
-import { fetchSpots, createSpot, deleteSpot, toggleSpotVisited } from "@/lib/api/spots"
+import { fetchSpots, createSpot, deleteSpot, toggleSpotVisited, updateSpot } from "@/lib/api/spots"
 import { toast } from "sonner"
 import type { Spot } from "@/types/spot"
+import { SpotDetailsDialog } from "@/components/spot-details-dialog"
 
 interface NavigationState {
   level: "continent" | "country" | "city" | "spots"
@@ -30,6 +31,8 @@ export default function Home() {
   const [view, setView] = useState<"list" | "map">("list")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
+  const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null)
+  const [isSpotDetailsOpen, setIsSpotDetailsOpen] = useState(false)
 
   useEffect(() => {
     // Avoid reloading (and showing the full-page skeleton) when Supabase refreshes the session
@@ -85,6 +88,24 @@ export default function Home() {
       toast.success(visited ? "Marked as visited" : "Marked as not visited")
     } catch (error) {
       console.error("Error toggling visited:", error)
+      toast.error("Failed to update spot")
+    }
+  }
+
+  const handleSpotClick = (spot: Spot) => {
+    setSelectedSpot(spot)
+    setIsSpotDetailsOpen(true)
+  }
+
+  const handleUpdateSpot = async (spot: Spot) => {
+    try {
+      const updated = await updateSpot(spot)
+      setSpots(spots.map((s) => (s.id === updated.id ? updated : s)))
+      setIsSpotDetailsOpen(false)
+      setSelectedSpot(null)
+      toast.success("Spot updated")
+    } catch (error) {
+      console.error("Error updating spot:", error)
       toast.error("Failed to update spot")
     }
   }
@@ -147,13 +168,29 @@ export default function Home() {
             <p className="text-sm text-muted-foreground">No spots added yet. Click "Add Spot" to get started.</p>
           </div>
         ) : view === "list" ? (
-          <ListView spots={filteredSpots} onDeleteSpot={handleDeleteSpot} onToggleVisited={handleToggleVisited} navigation={navigation} onNavigationChange={setNavigation} />
+          <ListView
+            spots={filteredSpots}
+            onDeleteSpot={handleDeleteSpot}
+            onToggleVisited={handleToggleVisited}
+            navigation={navigation}
+            onNavigationChange={setNavigation}
+            onSpotClick={handleSpotClick}
+          />
         ) : (
-          <MapView spots={filteredSpots} navigation={navigation} />
+          <MapView spots={filteredSpots} navigation={navigation} onSpotClick={handleSpotClick} />
         )}
       </div>
 
       <AddSpotDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onAddSpot={handleAddSpot} />
+      <SpotDetailsDialog
+        open={isSpotDetailsOpen}
+        onOpenChange={(open) => {
+          setIsSpotDetailsOpen(open)
+          if (!open) setSelectedSpot(null)
+        }}
+        spot={selectedSpot}
+        onSave={handleUpdateSpot}
+      />
     </main>
   )
 }

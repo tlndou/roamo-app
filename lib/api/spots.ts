@@ -4,6 +4,7 @@ import type { Database } from "@/types/supabase"
 
 type DbSpot = Database["public"]["Tables"]["spots"]["Row"]
 type InsertSpot = Database["public"]["Tables"]["spots"]["Insert"]
+type UpdateSpot = Database["public"]["Tables"]["spots"]["Update"]
 
 // Transform DB spot to app Spot type
 export function transformDbSpot(dbSpot: DbSpot): Spot {
@@ -46,6 +47,26 @@ export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
     lat: spot.coordinates.lat,
     lng: spot.coordinates.lng,
     visited: spot.visited,
+  }
+}
+
+export function transformToDbSpotUpdate(spot: Spot): UpdateSpot {
+  return {
+    category: spot.category,
+    name: spot.name,
+    city: spot.city,
+    country: spot.country,
+    continent: spot.continent,
+    address: spot.address ?? null,
+    comments: spot.comments ?? null,
+    use_custom_image: spot.useCustomImage,
+    custom_image: spot.customImage ?? null,
+    icon_color: spot.iconColor,
+    link: spot.link ?? null,
+    lat: spot.coordinates.lat,
+    lng: spot.coordinates.lng,
+    visited: spot.visited,
+    updated_at: new Date().toISOString(),
   }
 }
 
@@ -94,4 +115,22 @@ export async function toggleSpotVisited(id: string, visited: boolean): Promise<v
   const { error } = await supabase.from("spots").update({ visited, updated_at: new Date().toISOString() }).eq("id", id)
 
   if (error) throw error
+}
+
+export async function updateSpot(spot: Spot): Promise<Spot> {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Not authenticated")
+
+  const dbUpdate = transformToDbSpotUpdate(spot)
+
+  // @ts-ignore - Supabase type inference issue with update method
+  const { data, error } = await supabase.from("spots").update(dbUpdate).eq("id", spot.id).select().single()
+
+  if (error) throw error
+
+  return transformDbSpot(data)
 }
