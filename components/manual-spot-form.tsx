@@ -164,7 +164,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
           id="name"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Moeder"
+          placeholder="Cafè Roamo"
           required
         />
       </div>
