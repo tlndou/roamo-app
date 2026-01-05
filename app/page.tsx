@@ -14,12 +14,35 @@ import { fetchSpots, createSpot, deleteSpot, toggleSpotVisited, updateSpot } fro
 import { toast } from "sonner"
 import type { Spot } from "@/types/spot"
 import { SpotDetailsDialog } from "@/components/spot-details-dialog"
+import { getCountryContinent } from "@/lib/country-utils"
 
 interface NavigationState {
   level: "continent" | "country" | "city" | "spots"
   continent?: string
   country?: string
   city?: string
+}
+
+function deriveInitialNavigation(spots: Spot[]): NavigationState {
+  if (spots.length === 0) return { level: "continent" }
+
+  const continentOf = (s: Spot) => s.continent || getCountryContinent(s.country)
+
+  const continents = Array.from(new Set(spots.map(continentOf).filter(Boolean)))
+  if (continents.length !== 1) return { level: "continent" }
+
+  const continent = continents[0]
+  const continentSpots = spots.filter((s) => continentOf(s) === continent)
+  const countries = Array.from(new Set(continentSpots.map((s) => s.country).filter(Boolean)))
+  if (countries.length !== 1) return { level: "country", continent }
+
+  const country = countries[0]
+  const countrySpots = continentSpots.filter((s) => s.country === country)
+  const cities = Array.from(new Set(countrySpots.map((s) => s.city).filter(Boolean)))
+  if (cities.length !== 1) return { level: "city", continent, country }
+
+  const city = cities[0]
+  return { level: "spots", continent, country, city }
 }
 
 export default function Home() {
@@ -31,6 +54,7 @@ export default function Home() {
   const [view, setView] = useState<"list" | "map">("list")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
+  const [didInitNavigation, setDidInitNavigation] = useState(false)
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null)
   const [isSpotDetailsOpen, setIsSpotDetailsOpen] = useState(false)
 
@@ -42,6 +66,8 @@ export default function Home() {
     } else if (!authLoading) {
       setSpots([])
       setLoading(false)
+      setNavigation({ level: "continent" })
+      setDidInitNavigation(false)
     }
   }, [userId, authLoading])
 
@@ -50,6 +76,10 @@ export default function Home() {
       setLoading(true)
       const data = await fetchSpots()
       setSpots(data)
+      if (!didInitNavigation) {
+        setNavigation(deriveInitialNavigation(data))
+        setDidInitNavigation(true)
+      }
     } catch (error) {
       console.error("Error loading spots:", error)
       toast.error("Failed to load spots")
@@ -93,6 +123,7 @@ export default function Home() {
   }
 
   const handleSpotClick = (spot: Spot) => {
+    setDidInitNavigation(true)
     setSelectedSpot(spot)
     setIsSpotDetailsOpen(true)
   }
@@ -173,7 +204,10 @@ export default function Home() {
             onDeleteSpot={handleDeleteSpot}
             onToggleVisited={handleToggleVisited}
             navigation={navigation}
-            onNavigationChange={setNavigation}
+            onNavigationChange={(nav) => {
+              setDidInitNavigation(true)
+              setNavigation(nav)
+            }}
             onSpotClick={handleSpotClick}
           />
         ) : (
