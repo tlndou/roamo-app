@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { IconColorPicker } from "@/components/icon-color-picker"
+import { StarRating } from "@/components/ui/star-rating"
 import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
 import { getCountryContinent } from "@/lib/country-utils"
 import { cn } from "@/lib/utils"
@@ -80,21 +81,57 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select value={draft.category} onValueChange={(v) => setDraft({ ...draft, category: v as SpotCategory })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={draft.category} onValueChange={(v) => setDraft({ ...draft, category: v as SpotCategory })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={draft.visited ? "visited" : "to-visit"}
+                onValueChange={(v) => {
+                  const isVisited = v === "visited"
+                  setDraft({
+                    ...draft,
+                    visited: isVisited,
+                    // Clear rating if changing to "To visit"
+                    rating: isVisited ? draft.rating : undefined
+                  })
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="to-visit">To visit</SelectItem>
+                  <SelectItem value="visited">Visited</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {draft.visited && (
+            <div className="space-y-2">
+              <Label>Rating</Label>
+              <StarRating
+                value={draft.rating ?? 0}
+                onChange={(value) => setDraft({ ...draft, rating: value })}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Name</Label>

@@ -22,6 +22,7 @@ export function transformDbSpot(dbSpot: DbSpot): Spot {
     iconColor: dbSpot.icon_color as Spot["iconColor"],
     link: dbSpot.link ?? undefined,
     visited: dbSpot.visited,
+    rating: dbSpot.rating != null ? Number(dbSpot.rating) : undefined,
     coordinates: {
       lat: Number(dbSpot.lat),
       lng: Number(dbSpot.lng),
@@ -47,6 +48,7 @@ export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
     lat: spot.coordinates.lat,
     lng: spot.coordinates.lng,
     visited: spot.visited,
+    rating: spot.rating ?? null,
   }
 }
 
@@ -66,6 +68,7 @@ export function transformToDbSpotUpdate(spot: Spot): UpdateSpot {
     lat: spot.coordinates.lat,
     lng: spot.coordinates.lng,
     visited: spot.visited,
+    rating: spot.rating ?? null,
     updated_at: new Date().toISOString(),
   }
 }

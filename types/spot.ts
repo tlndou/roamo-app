@@ -32,6 +32,7 @@ export interface Spot {
   iconColor: IconColor
   link?: string
   visited: boolean
+  rating?: number // 0-5 with 0.5 increments, only when visited
   coordinates: {
     lat: number
     lng: number

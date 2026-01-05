@@ -3,7 +3,6 @@
 import { useMemo } from "react"
 import { ChevronRight, ExternalLink, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
 import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
@@ -128,15 +127,6 @@ export function ListView({
             if (e.key === "Enter" || e.key === " ") onSpotClick(spot)
           }}
         >
-          {/* Visited Checkbox */}
-          <div className="pt-1">
-            <Checkbox
-              checked={spot.visited}
-              onCheckedChange={(checked) => onToggleVisited(spot.id, checked as boolean)}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-
           {/* Icon or Image */}
           {spot.useCustomImage && spot.customImage ? (
             <img src={spot.customImage} alt={spot.name} className="h-16 w-16 rounded-md object-cover" />
