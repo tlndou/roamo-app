@@ -113,7 +113,6 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
 export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
   const [mapKey, setMapKey] = useState(0)
-  const mapRef = useRef<any>(null)
 
   useEffect(() => {
     setIsMounted(true)
@@ -125,29 +124,7 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
   useEffect(() => {
     if (!isMounted) return
     setMapKey((k) => k + 1)
-  }, [isMounted, navigation?.continent, navigation?.country, navigation?.city])
-
-  // Defensive cleanup: in dev/HMR/StrictMode Leaflet can leave a stale map instance on the same container.
-  // Explicitly remove the map and clear Leaflet's internal container id to prevent "Map container is being reused".
-  useEffect(() => {
-    return () => {
-      const map = mapRef.current
-      if (!map) return
-      try {
-        map.off?.()
-        map.remove?.()
-        const container = map.getContainer?.()
-        if (container) {
-          // Leaflet uses this marker to detect reuse.
-          ;(container as any)._leaflet_id = null
-        }
-      } catch {
-        // ignore
-      } finally {
-        mapRef.current = null
-      }
-    }
-  }, [mapKey])
+  }, [isMounted])
 
   const visibleSpots = useMemo(() => {
     if (!navigation) return spots
@@ -245,56 +222,57 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
 
       {/* Interactive Leaflet Map */}
       <div className="relative h-[600px] overflow-hidden rounded-lg">
-        <MapContainer
-          key={mapKey}
-          center={[20, 0]}
-          zoom={2}
-          minZoom={2}
-          maxZoom={18}
-          scrollWheelZoom={true}
-          whenCreated={(map) => {
-            mapRef.current = map
-          }}
-          maxBounds={[
-            [-90, -180],
-            [90, 180],
-          ]}
-          maxBoundsViscosity={1.0}
-          className="h-full w-full"
-          style={{ background: "hsl(var(--muted))" }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapBounds spots={spots} navigation={navigation} />
-          {Object.entries(citySpotCounts).map(([key, data]) => (
-            <Marker
-              key={key}
-              position={[data.coords.lat, data.coords.lng]}
-              icon={createCustomIcon(data.count)}
-            >
-              <Popup>
-                <div className="min-w-[200px]">
-                  <h4 className="mb-2 font-semibold">{data.cityName}</h4>
-                  <p className="mb-2 text-sm text-muted-foreground">{data.categorySummary}</p>
-                  <div className="space-y-1">
-                    {data.spots.map((spot) => (
-                      <button
-                        key={spot.id}
-                        type="button"
-                        className="block w-full text-left text-sm hover:underline"
-                        onClick={() => onSpotClick?.(spot)}
-                      >
-                        • {spot.name}
-                      </button>
-                    ))}
+        <div id={`map-container-${mapKey}`} className="h-full w-full" style={{ background: "hsl(var(--muted))" }}>
+          <MapContainer
+            center={[20, 0]}
+            zoom={2}
+            minZoom={2}
+            maxZoom={18}
+            scrollWheelZoom={true}
+            maxBounds={[
+              [-90, -180],
+              [90, 180],
+            ]}
+            maxBoundsViscosity={1.0}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <MapBounds spots={spots} navigation={navigation} />
+            {Object.entries(citySpotCounts).map(([key, data]) => (
+              <Marker
+                key={key}
+                position={[data.coords.lat, data.coords.lng]}
+                icon={createCustomIcon(data.count)}
+              >
+                <Popup>
+                  <div className="min-w-[200px]">
+                    <div className="space-y-2">
+                      {data.spots.map((spot) => (
+                        <button
+                          key={spot.id}
+                          type="button"
+                          className="block w-full text-left hover:bg-muted/50 rounded px-2 py-1 transition-colors"
+                          onClick={() => onSpotClick?.(spot)}
+                        >
+                          <div className="font-medium text-sm leading-tight">{spot.name}</div>
+                          <div className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            {spot.category.charAt(0).toUpperCase() + spot.category.slice(1)}
+                          </div>
+                          <div className="text-xs text-muted-foreground leading-tight">
+                            {spot.city}, {spot.country}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
       </div>
 
       {/* Legend */}
