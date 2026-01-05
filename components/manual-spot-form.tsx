@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Upload, Image as ImageIcon } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils"
 interface ManualSpotFormProps {
   onSubmit: (spot: Spot) => void
 }
+
+const MANUAL_DRAFT_KEY = "roamo:addSpot:manualDraft:v1"
 
 const categories: { value: SpotCategory; label: string }[] = [
   { value: "restaurant", label: "Restaurant" },
@@ -52,6 +54,36 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     link: "",
     visited: false,
   })
+
+  const hydratedRef = useRef(false)
+
+  // Restore draft after tab switch / refresh.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(MANUAL_DRAFT_KEY)
+      if (!raw) {
+        hydratedRef.current = true
+        return
+      }
+      const parsed = JSON.parse(raw) as { locationSearch?: string; formData?: Partial<typeof formData> }
+      if (parsed.locationSearch) setLocationSearch(parsed.locationSearch)
+      if (parsed.formData) setFormData((prev) => ({ ...prev, ...parsed.formData }))
+    } catch {
+      // ignore
+    } finally {
+      hydratedRef.current = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!hydratedRef.current) return
+    try {
+      window.sessionStorage.setItem(MANUAL_DRAFT_KEY, JSON.stringify({ locationSearch, formData }))
+    } catch {
+      // ignore
+    }
+  }, [locationSearch, formData])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -89,6 +121,11 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
       id: Date.now().toString(),
       ...formData,
     })
+    try {
+      window.sessionStorage.removeItem(MANUAL_DRAFT_KEY)
+    } catch {
+      // ignore
+    }
   }
 
   return (

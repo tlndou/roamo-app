@@ -156,6 +156,9 @@ const countryToContinentMap: Record<string, string> = {
   ukraine: "Europe",
   "united kingdom": "Europe",
   uk: "Europe",
+  gb: "Europe",
+  "great britain": "Europe",
+  britain: "Europe",
   england: "Europe",
   scotland: "Europe",
   wales: "Europe",
@@ -225,4 +228,21 @@ const countryToContinentMap: Record<string, string> = {
 export function getCountryContinent(country: string): string {
   const normalized = country.toLowerCase().trim()
   return countryToContinentMap[normalized] || "Other"
+}
+
+export function normalizeCountryName(country: string): string {
+  const normalized = country.toLowerCase().trim()
+
+  // Normalize GB to UK
+  if (normalized === "gb" || normalized === "great britain" || normalized === "britain") {
+    return "UK"
+  }
+
+  // Normalize United States variations
+  if (normalized === "us" || normalized === "usa" || normalized === "united states of america") {
+    return "United States"
+  }
+
+  // Return original if no normalization needed
+  return country
 }
