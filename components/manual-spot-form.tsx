@@ -55,6 +55,14 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     visited: false,
   })
 
+  const canSubmit =
+    formData.name.trim().length > 0 &&
+    formData.city.trim().length > 0 &&
+    formData.country.trim().length > 0 &&
+    Number.isFinite(formData.coordinates.lat) &&
+    Number.isFinite(formData.coordinates.lng) &&
+    !(formData.coordinates.lat === 0 && formData.coordinates.lng === 0)
+
   const hydratedRef = useRef(false)
 
   // Restore draft after tab switch / refresh.
@@ -117,6 +125,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!canSubmit) return
     onSubmit({
       id: Date.now().toString(),
       ...formData,
@@ -164,7 +173,19 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
         <Label htmlFor="location">Location</Label>
         <LocationAutocomplete
           value={locationSearch}
-          onChange={setLocationSearch}
+          onChange={(value) => {
+            // If the user types without selecting a suggestion, keep preventing submit.
+            setLocationSearch(value)
+            if (formData.city || formData.country) {
+              setFormData({
+                ...formData,
+                city: "",
+                country: "",
+                continent: "",
+                coordinates: { lat: 0, lng: 0 },
+              })
+            }
+          }}
           onLocationSelect={handleLocationSelect}
           placeholder="Search for a city or address..."
           required
@@ -321,7 +342,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
         />
       </div>
 
-      <Button type="submit" className="w-full" size="lg">
+      <Button type="submit" className="w-full" size="lg" disabled={!canSubmit}>
         Add Spot
       </Button>
     </form>

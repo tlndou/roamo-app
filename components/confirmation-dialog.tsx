@@ -42,6 +42,11 @@ export function ConfirmationDialog({
     return parts.join(", ")
   })
 
+  const hasValidLocation =
+    editedDraft.city !== "Unknown" &&
+    editedDraft.country !== "Unknown" &&
+    !(editedDraft.coordinates.lat === 0 && editedDraft.coordinates.lng === 0)
+
   const getConfidenceBadge = (confidence: string) => {
     const colors = {
       high: "bg-green-500",
@@ -288,7 +293,7 @@ export function ConfirmationDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={() => onConfirm(editedDraft)}>
+          <Button onClick={() => onConfirm(editedDraft)} disabled={!hasValidLocation}>
             Confirm & Add Spot
           </Button>
         </DialogFooter>

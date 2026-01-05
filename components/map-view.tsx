@@ -4,6 +4,7 @@ import { useMemo, useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import { MapPin } from "lucide-react"
 import type { Spot } from "@/types/spot"
+import { getCountryContinent } from "@/lib/country-utils"
 
 // Dynamically import Leaflet components with no SSR
 const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), { ssr: false })
@@ -57,14 +58,28 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
   const map = useMap()
 
   useEffect(() => {
-    if (spots.length > 0 && typeof window !== "undefined") {
+    if (typeof window === "undefined") return
+
+    const L = require("leaflet")
+
+    // Leaflet commonly needs a resize invalidation when its container becomes visible (e.g. switching tabs/views).
+    // This helps avoid "blank/solid" map tiles until interaction.
+    setTimeout(() => {
+      try {
+        map.invalidateSize()
+      } catch {
+        // ignore
+      }
+    }, 0)
+
+    if (spots.length > 0) {
       const L = require("leaflet")
 
       // Filter spots based on navigation
       let filteredSpots = spots
       if (navigation) {
         if (navigation.continent) {
-          filteredSpots = spots.filter((s) => s.continent === navigation.continent)
+          filteredSpots = spots.filter((s) => (s.continent || getCountryContinent(s.country)) === navigation.continent)
         }
         if (navigation.country) {
           filteredSpots = filteredSpots.filter((s) => s.country === navigation.country)
@@ -75,9 +90,17 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
       }
 
       if (filteredSpots.length > 0) {
-        const bounds = L.latLngBounds(filteredSpots.map((spot: Spot) => [spot.coordinates.lat, spot.coordinates.lng]))
+        const coords = filteredSpots
+          .map((spot: Spot) => [Number(spot.coordinates.lat), Number(spot.coordinates.lng)] as const)
+          .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0))
+        if (coords.length === 0) return
+
+        const bounds = L.latLngBounds(coords)
         map.fitBounds(bounds, { padding: [50, 50] })
       }
+    } else {
+      // No spots for the current navigation filter: reset to world view.
+      map.setView([20, 0], 2)
     }
   }, [spots, navigation, map])
 
@@ -86,10 +109,42 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
 
 export function MapView({ spots, navigation }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
+  const [mapKey, setMapKey] = useState(0)
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Leaflet can throw "Map container is being reused by another instance" in dev
+  // when this component is mounted/unmounted quickly (e.g. view toggles, React strict mode, HMR).
+  // Forcing the MapContainer to remount onto a fresh DOM node avoids reusing an old Leaflet container.
+  useEffect(() => {
+    if (!isMounted) return
+    setMapKey((k) => k + 1)
+  }, [isMounted, navigation?.continent, navigation?.country, navigation?.city])
+
+  const visibleSpots = useMemo(() => {
+    if (!navigation) return spots
+    let filtered = spots
+    if (navigation.continent) {
+      filtered = filtered.filter((s) => (s.continent || getCountryContinent(s.country)) === navigation.continent)
+    }
+    if (navigation.country) {
+      filtered = filtered.filter((s) => s.country === navigation.country)
+    }
+    if (navigation.city) {
+      filtered = filtered.filter((s) => s.city === navigation.city)
+    }
+    return filtered
+  }, [spots, navigation])
+
+  const visibleSpotsWithCoords = useMemo(() => {
+    return visibleSpots.filter((s) => !(s.coordinates.lat === 0 && s.coordinates.lng === 0))
+  }, [visibleSpots])
+
+  const missingCoordsCount = useMemo(() => {
+    return visibleSpots.length - visibleSpotsWithCoords.length
+  }, [visibleSpots, visibleSpotsWithCoords])
 
   const citySpotCounts = useMemo(() => {
     const counts: Record<
@@ -97,7 +152,7 @@ export function MapView({ spots, navigation }: MapViewProps) {
       { count: number; coords: { lat: number; lng: number }; cityName: string; spots: Spot[] }
     > = {}
 
-    spots.forEach((spot) => {
+    visibleSpotsWithCoords.forEach((spot) => {
       const key = `${spot.city}, ${spot.country}`
       if (!counts[key]) {
         counts[key] = {
@@ -112,7 +167,7 @@ export function MapView({ spots, navigation }: MapViewProps) {
     })
 
     return counts
-  }, [spots])
+  }, [visibleSpotsWithCoords])
 
   if (!isMounted) {
     return (
@@ -129,11 +184,22 @@ export function MapView({ spots, navigation }: MapViewProps) {
       <div className="mb-6">
         <h3 className="text-lg font-medium">World Map</h3>
         <p className="mt-1 text-sm text-muted-foreground">Interactive map of your saved spots</p>
+        {missingCoordsCount > 0 && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {missingCoordsCount} {missingCoordsCount === 1 ? "spot is" : "spots are"} missing map coordinates and won’t appear on the map until a location is selected.
+          </p>
+        )}
+        {Object.keys(citySpotCounts).length === 0 && visibleSpots.length > 0 && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            No mappable spots for this view yet. Add or fix a spot by selecting a location so it has real coordinates.
+          </p>
+        )}
       </div>
 
       {/* Interactive Leaflet Map */}
       <div className="relative h-[600px] overflow-hidden rounded-lg">
         <MapContainer
+          key={mapKey}
           center={[20, 0]}
           zoom={2}
           minZoom={2}
