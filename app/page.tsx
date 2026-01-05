@@ -51,7 +51,7 @@ export default function Home() {
   const [spots, setSpots] = useState<Spot[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [view, setView] = useState<"list" | "map">("list")
+  const [view, setView] = useState<"list" | "map" | "explore">("list")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
   const [didInitNavigation, setDidInitNavigation] = useState(false)
@@ -209,6 +209,20 @@ export default function Home() {
               setNavigation(nav)
             }}
             onSpotClick={handleSpotClick}
+            mode="browse"
+          />
+        ) : view === "explore" ? (
+          <ListView
+            spots={filteredSpots}
+            onDeleteSpot={handleDeleteSpot}
+            onToggleVisited={handleToggleVisited}
+            navigation={navigation}
+            onNavigationChange={(nav) => {
+              setDidInitNavigation(true)
+              setNavigation(nav)
+            }}
+            onSpotClick={handleSpotClick}
+            mode="all"
           />
         ) : (
           <MapView spots={filteredSpots} navigation={navigation} onSpotClick={handleSpotClick} />

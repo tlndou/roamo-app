@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { ChevronRight, ExternalLink, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -23,6 +23,7 @@ interface ListViewProps {
   navigation: NavigationState
   onNavigationChange: (nav: NavigationState) => void
   onSpotClick: (spot: Spot) => void
+  mode: "browse" | "all"
 }
 
 interface GroupedSpots {
@@ -40,7 +41,15 @@ interface NavigationState {
   city?: string
 }
 
-export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onNavigationChange, onSpotClick }: ListViewProps) {
+export function ListView({
+  spots,
+  onDeleteSpot,
+  onToggleVisited,
+  navigation,
+  onNavigationChange,
+  onSpotClick,
+  mode,
+}: ListViewProps) {
 
   const groupedSpots = useMemo(() => {
     const grouped: GroupedSpots = {}
@@ -80,6 +89,123 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
 
     return crumbs
   }, [navigation, onNavigationChange])
+
+  const BreadcrumbNav = () => (
+    <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+      {breadcrumbs.map((crumb, index) => (
+        <div key={crumb.label} className="flex items-center gap-2">
+          {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
+          <button
+            onClick={crumb.onClick}
+            className={index === breadcrumbs.length - 1 ? "text-foreground" : "hover:text-foreground"}
+          >
+            {crumb.label}
+          </button>
+        </div>
+      ))}
+    </nav>
+  )
+
+  const filteredByScope = useMemo(() => {
+    const continentOf = (s: Spot) => s.continent || getCountryContinent(s.country)
+    let out = spots
+    if (navigation.continent) out = out.filter((s) => continentOf(s) === navigation.continent)
+    if (navigation.country) out = out.filter((s) => s.country === navigation.country)
+    if (navigation.city) out = out.filter((s) => s.city === navigation.city)
+    return out
+  }, [spots, navigation])
+
+  const SpotCards = ({ items }: { items: Spot[] }) => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {items.map((spot) => (
+        <div
+          key={spot.id}
+          className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
+          role="button"
+          tabIndex={0}
+          onClick={() => onSpotClick(spot)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onSpotClick(spot)
+          }}
+        >
+          {/* Visited Checkbox */}
+          <div className="pt-1">
+            <Checkbox
+              checked={spot.visited}
+              onCheckedChange={(checked) => onToggleVisited(spot.id, checked as boolean)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          {/* Icon or Image */}
+          {spot.useCustomImage && spot.customImage ? (
+            <img src={spot.customImage} alt={spot.name} className="h-16 w-16 rounded-md object-cover" />
+          ) : (
+            <div className={cn("flex h-16 w-16 items-center justify-center rounded-md", iconColorBgClasses[spot.iconColor])}>
+              {(() => {
+                const Icon = categoryIcons[spot.category]
+                return <Icon className={cn("h-7 w-7", iconColorClasses[spot.iconColor])} />
+              })()}
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 space-y-1">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="font-medium leading-none">{spot.name}</h4>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {spot.category.charAt(0).toUpperCase() + spot.category.slice(1)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {spot.city}, {spot.country}
+                </p>
+              </div>
+
+              <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {spot.link && (
+                  <Button size="icon" variant="ghost" className="h-8 w-8" asChild onClick={(e) => e.stopPropagation()}>
+                    <a href={spot.link} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDeleteSpot(spot.id)
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Intentionally do not show comments/description in List/Explore cards */}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  if (mode === "all") {
+    return (
+      <div className="space-y-6">
+        <BreadcrumbNav />
+
+        {filteredByScope.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            No spots in this scope.
+          </div>
+        ) : (
+          <SpotCards items={filteredByScope} />
+        )}
+      </div>
+    )
+  }
 
   if (navigation.level === "continent") {
     const continents = Object.entries(groupedSpots).map(([continent, countries]) => {
@@ -122,19 +248,7 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
     return (
       <div className="space-y-6">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={crumb.label} className="flex items-center gap-2">
-              {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
-              <button
-                onClick={crumb.onClick}
-                className={index === breadcrumbs.length - 1 ? "text-foreground" : "hover:text-foreground"}
-              >
-                {crumb.label}
-              </button>
-            </div>
-          ))}
-        </nav>
+        <BreadcrumbNav />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {countries.map(({ name, count }) => (
@@ -167,19 +281,7 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
     return (
       <div className="space-y-6">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={crumb.label} className="flex items-center gap-2">
-              {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
-              <button
-                onClick={crumb.onClick}
-                className={index === breadcrumbs.length - 1 ? "text-foreground" : "hover:text-foreground"}
-              >
-                {crumb.label}
-              </button>
-            </div>
-          ))}
-        </nav>
+        <BreadcrumbNav />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cities.map(({ name, count }) => (
@@ -215,99 +317,9 @@ export function ListView({ spots, onDeleteSpot, onToggleVisited, navigation, onN
     return (
       <div className="space-y-6">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={crumb.label} className="flex items-center gap-2">
-              {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
-              <button
-                onClick={crumb.onClick}
-                className={index === breadcrumbs.length - 1 ? "text-foreground" : "hover:text-foreground"}
-              >
-                {crumb.label}
-              </button>
-            </div>
-          ))}
-        </nav>
+        <BreadcrumbNav />
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {citySpots.map((spot) => (
-            <div
-              key={spot.id}
-              className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
-              role="button"
-              tabIndex={0}
-              onClick={() => onSpotClick(spot)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") onSpotClick(spot)
-              }}
-            >
-              {/* Visited Checkbox */}
-              <div className="pt-1">
-                <Checkbox
-                  checked={spot.visited}
-                  onCheckedChange={(checked) => onToggleVisited(spot.id, checked as boolean)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-
-              {/* Icon or Image */}
-              {spot.useCustomImage && spot.customImage ? (
-                <img
-                  src={spot.customImage}
-                  alt={spot.name}
-                  className="h-16 w-16 rounded-md object-cover"
-                />
-              ) : (
-                <div
-                  className={cn(
-                    "flex h-16 w-16 items-center justify-center rounded-md",
-                    iconColorBgClasses[spot.iconColor]
-                  )}
-                >
-                  {(() => {
-                    const Icon = categoryIcons[spot.category]
-                    return <Icon className={cn("h-7 w-7", iconColorClasses[spot.iconColor])} />
-                  })()}
-                </div>
-              )}
-
-              {/* Content */}
-              <div className="flex-1 space-y-1">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h4 className="font-medium leading-none">{spot.name}</h4>
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      {spot.category.charAt(0).toUpperCase() + spot.category.slice(1)}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    {spot.link && (
-                      <Button size="icon" variant="ghost" className="h-8 w-8" asChild onClick={(e) => e.stopPropagation()}>
-                        <a href={spot.link} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </Button>
-                    )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDeleteSpot(spot.id)
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {spot.comments && <p className="text-sm text-muted-foreground">{spot.comments}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
+        <SpotCards items={citySpots} />
       </div>
     )
   }
