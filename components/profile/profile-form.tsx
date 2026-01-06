@@ -4,12 +4,13 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Check, X, Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { AvatarUpload } from "./avatar-upload"
-import { profileSchema, type ProfileFormData } from "@/lib/validations/profile"
+import { profileEditSchema, type ProfileEditFormData } from "@/lib/validations/profile"
 import { checkUsernameAvailable, updateProfile, uploadAvatar } from "@/lib/api/profiles"
 import { useAuth } from "@/components/providers/auth-provider"
 import { toast } from "sonner"
@@ -21,8 +22,11 @@ interface ProfileFormProps {
 
 export function ProfileForm({ profile }: ProfileFormProps) {
   const { user, refreshProfile } = useAuth()
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarRemoved, setAvatarRemoved] = useState(false)
+  const [avatarDirty, setAvatarDirty] = useState(false)
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
 
@@ -32,8 +36,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
     watch,
     formState: { errors, isDirty },
     reset,
-  } = useForm<ProfileFormData>({
-    resolver: zodResolver(profileSchema),
+  } = useForm<ProfileEditFormData>({
+    resolver: zodResolver(profileEditSchema),
     defaultValues: {
       displayName: profile.displayName || "",
       username: profile.username || "",
@@ -65,7 +69,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
     return () => clearTimeout(timer)
   }, [username, profile.username, user?.id])
 
-  const onSubmit = async (data: ProfileFormData) => {
+  const onSubmit = async (data: ProfileEditFormData) => {
     if (!user) return
 
     // Check username availability before submitting
@@ -79,7 +83,12 @@ export function ProfileForm({ profile }: ProfileFormProps) {
 
       let avatarUrl = profile.avatarUrl
 
-      // Upload avatar if new file selected
+      // If user explicitly removed avatar, clear it.
+      if (avatarRemoved) {
+        avatarUrl = null
+      }
+
+      // Upload avatar if new file selected (overrides removal)
       if (avatarFile) {
         avatarUrl = await uploadAvatar(user.id, avatarFile)
       }
@@ -89,7 +98,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         displayName: data.displayName,
         username: data.username,
         bio: data.bio || undefined,
-        avatarUrl: avatarUrl || undefined,
+        avatarUrl,
       })
 
       // Refresh profile data
@@ -98,6 +107,9 @@ export function ProfileForm({ profile }: ProfileFormProps) {
       toast.success("Profile updated successfully")
       reset(data)
       setAvatarFile(null)
+      setAvatarRemoved(false)
+      setAvatarDirty(false)
+      router.push("/profile")
     } catch (error: any) {
       console.error("Error updating profile:", error)
       if (error.message?.includes("username")) {
@@ -112,6 +124,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
 
   const handleAvatarRemove = () => {
     setAvatarFile(null)
+    setAvatarRemoved(true)
+    setAvatarDirty(true)
   }
 
   const charCount = watch("bio")?.length || 0
@@ -122,8 +136,12 @@ export function ProfileForm({ profile }: ProfileFormProps) {
       <div>
         <Label className="mb-4 block">Profile Photo</Label>
         <AvatarUpload
-          currentAvatarUrl={profile.avatarUrl}
-          onImageSelect={setAvatarFile}
+          currentAvatarUrl={avatarRemoved ? null : profile.avatarUrl}
+          onImageSelect={(file) => {
+            setAvatarFile(file)
+            setAvatarRemoved(false)
+            setAvatarDirty(true)
+          }}
           onRemove={handleAvatarRemove}
           displayName={profile.displayName || profile.username}
         />
@@ -182,7 +200,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
 
       {/* Buttons */}
       <div className="flex gap-4">
-        <Button type="submit" disabled={!isDirty || isSubmitting || usernameAvailable === false}>
+        <Button type="submit" disabled={!(isDirty || avatarDirty) || isSubmitting || usernameAvailable === false}>
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -192,7 +210,18 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             "Save Changes"
           )}
         </Button>
-        <Button type="button" variant="outline" onClick={() => reset()} disabled={!isDirty || isSubmitting}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            reset()
+            setAvatarFile(null)
+            setAvatarRemoved(false)
+            setAvatarDirty(false)
+            router.push("/profile")
+          }}
+          disabled={!(isDirty || avatarDirty) || isSubmitting}
+        >
           Cancel
         </Button>
       </div>

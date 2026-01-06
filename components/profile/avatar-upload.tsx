@@ -4,6 +4,7 @@ import { useState, useRef } from "react"
 import { Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ImageCropDialog } from "@/components/image-crop-dialog"
 import { cn } from "@/lib/utils"
 
 interface AvatarUploadProps {
@@ -15,7 +16,21 @@ interface AvatarUploadProps {
 
 export function AvatarUpload({ currentAvatarUrl, onImageSelect, onRemove, displayName }: AvatarUploadProps) {
   const [preview, setPreview] = useState<string | null>(null)
+  const [cleared, setCleared] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null)
+  const [pendingFilename, setPendingFilename] = useState<string>("avatar.jpg")
+  const [isCropOpen, setIsCropOpen] = useState(false)
+
+  const dataUrlToFile = (dataUrl: string, filename: string): File => {
+    const [header, data] = dataUrl.split(",")
+    const mimeMatch = header.match(/data:([^;]+);base64/)
+    const mime = mimeMatch?.[1] || "image/jpeg"
+    const binary = atob(data)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new File([bytes], filename, { type: mime })
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -33,25 +48,26 @@ export function AvatarUpload({ currentAvatarUrl, onImageSelect, onRemove, displa
       return
     }
 
-    // Create preview
     const reader = new FileReader()
     reader.onloadend = () => {
-      setPreview(reader.result as string)
+      setCleared(false)
+      setPendingCropSrc(reader.result as string)
+      setPendingFilename(file.name || "avatar.jpg")
+      setIsCropOpen(true)
     }
     reader.readAsDataURL(file)
-
-    onImageSelect(file)
   }
 
   const handleRemove = () => {
     setPreview(null)
+    setCleared(true) // immediately hide currentAvatarUrl so fallback shows right away
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
     onRemove()
   }
 
-  const avatarSrc = preview || currentAvatarUrl || undefined
+  const avatarSrc = preview || (cleared ? null : currentAvatarUrl) || undefined
   const initials = displayName
     ?.split(" ")
     .map((n) => n[0])
@@ -61,9 +77,33 @@ export function AvatarUpload({ currentAvatarUrl, onImageSelect, onRemove, displa
 
   return (
     <div className="flex items-center gap-6">
+      <ImageCropDialog
+        open={isCropOpen}
+        onOpenChange={setIsCropOpen}
+        src={pendingCropSrc}
+        title="Crop profile photo"
+        maskShape="circle"
+        outputSize={512}
+        onCancel={() => {
+          setPendingCropSrc(null)
+          if (fileInputRef.current) fileInputRef.current.value = ""
+        }}
+        onCropped={(dataUrl) => {
+          setPreview(dataUrl)
+          setCleared(false)
+          const f = dataUrlToFile(dataUrl, pendingFilename)
+          onImageSelect(f)
+          setPendingCropSrc(null)
+          if (fileInputRef.current) fileInputRef.current.value = ""
+        }}
+      />
+
       <div className="relative">
         <Avatar className="h-24 w-24">
-          {avatarSrc ? <AvatarImage src={avatarSrc} alt={displayName || "Avatar"} /> : <AvatarFallback className="text-2xl">{initials}</AvatarFallback>}
+          {avatarSrc ? <AvatarImage src={avatarSrc} alt={displayName || "Avatar"} /> : null}
+          <AvatarFallback className="text-2xl font-semibold text-muted-foreground ring-1 ring-border" delayMs={0}>
+            {initials}
+          </AvatarFallback>
         </Avatar>
         {avatarSrc && (
           <button
@@ -89,7 +129,7 @@ export function AvatarUpload({ currentAvatarUrl, onImageSelect, onRemove, displa
           <Upload className="h-4 w-4" />
           {avatarSrc ? "Change Photo" : "Upload Photo"}
         </Button>
-        <p className="mt-2 text-xs text-muted-foreground">JPG, PNG or WEBP. Max 2MB.</p>
+        <p className="mt-2 text-xs text-muted-foreground">JPG, PNG or WEBP. Max 2MB. You’ll be able to crop after selecting.</p>
       </div>
     </div>
   )

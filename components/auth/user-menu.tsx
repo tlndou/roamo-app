@@ -33,7 +33,7 @@ export function UserMenu() {
         <button className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring rounded-full">
           <Avatar>
             {profile.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={displayName} />}
-            <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
+            <AvatarFallback className="font-semibold text-muted-foreground ring-1 ring-border">{initials}</AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>

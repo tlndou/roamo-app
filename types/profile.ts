@@ -15,7 +15,7 @@ export interface ProfileUpdate {
   displayName?: string
   username?: string
   bio?: string
-  avatarUrl?: string
+  avatarUrl?: string | null
   birthdate?: string
   zodiacSign?: string
 }

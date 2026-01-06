@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { IconColorPicker } from "@/components/icon-color-picker"
 import { StarRating } from "@/components/ui/star-rating"
+import { ImageCropDialog } from "@/components/image-crop-dialog"
 import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
 import { getCountryContinent } from "@/lib/country-utils"
 import { cn } from "@/lib/utils"
@@ -43,6 +44,8 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
   const [draft, setDraft] = useState<Spot | null>(spot)
   const [saving, setSaving] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null)
+  const [isCropOpen, setIsCropOpen] = useState(false)
 
   useEffect(() => {
     setDraft(spot)
@@ -81,6 +84,18 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
         </DialogHeader>
 
         <div className="space-y-5">
+          <ImageCropDialog
+            open={isCropOpen}
+            onOpenChange={setIsCropOpen}
+            src={pendingCropSrc}
+            title="Crop photo"
+            onCancel={() => setPendingCropSrc(null)}
+            onCropped={(dataUrl) => {
+              setDraft((prev) => (prev ? { ...prev, customImage: dataUrl, useCustomImage: true } : prev))
+              setPendingCropSrc(null)
+            }}
+          />
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Category</Label>
@@ -259,7 +274,8 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
                     if (!file) return
                     const reader = new FileReader()
                     reader.onloadend = () => {
-                      setDraft({ ...draft, customImage: reader.result as string, useCustomImage: true })
+                      setPendingCropSrc(reader.result as string)
+                      setIsCropOpen(true)
                     }
                     reader.readAsDataURL(file)
                   }}
@@ -268,6 +284,7 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Image
                 </Button>
+                <p className="text-xs text-muted-foreground">After selecting a photo, you’ll be able to crop it to a square.</p>
 
                 {draft.customImage ? (
                   <div className="relative overflow-hidden rounded-lg border border-border">

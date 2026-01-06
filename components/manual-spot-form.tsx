@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { IconColorPicker } from "@/components/icon-color-picker"
+import { ImageCropDialog } from "@/components/image-crop-dialog"
 import { categoryIcons, iconColorClasses, iconColorBgClasses } from "@/lib/category-icons"
 import type { Spot, SpotCategory, IconColor } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
@@ -39,6 +40,8 @@ const categories: { value: SpotCategory; label: string }[] = [
 
 export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
   const [locationSearch, setLocationSearch] = useState("")
+  const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null)
+  const [isCropOpen, setIsCropOpen] = useState(false)
   const [formData, setFormData] = useState({
     category: "restaurant" as SpotCategory,
     name: "",
@@ -98,7 +101,8 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setFormData({ ...formData, customImage: reader.result as string, useCustomImage: true })
+        setPendingCropSrc(reader.result as string)
+        setIsCropOpen(true)
       }
       reader.readAsDataURL(file)
     }
@@ -139,6 +143,20 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      <ImageCropDialog
+        open={isCropOpen}
+        onOpenChange={setIsCropOpen}
+        src={pendingCropSrc}
+        title="Crop photo"
+        onCancel={() => {
+          setPendingCropSrc(null)
+        }}
+        onCropped={(dataUrl) => {
+          setFormData((prev) => ({ ...prev, customImage: dataUrl, useCustomImage: true }))
+          setPendingCropSrc(null)
+        }}
+      />
+
       <div className="space-y-2">
         <Label htmlFor="category">Category</Label>
         <Select
@@ -303,6 +321,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
                 Upload Image
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">After selecting a photo, you’ll be able to crop it to a square.</p>
 
             {formData.customImage && (
               <div className="relative overflow-hidden rounded-lg border border-border">
