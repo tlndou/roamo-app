@@ -15,18 +15,23 @@ import { updateProfile, uploadAvatar } from "@/lib/api/profiles"
 import { useAuth } from "@/components/providers/auth-provider"
 import { toast } from "sonner"
 import type { Profile } from "@/types/profile"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface ProfileFormProps {
   profile: Profile
 }
 
 export function ProfileForm({ profile }: ProfileFormProps) {
-  const { user, refreshProfile } = useAuth()
+  const { user, refreshProfile, signOut } = useAuth()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarRemoved, setAvatarRemoved] = useState(false)
   const [avatarDirty, setAvatarDirty] = useState(false)
+  const [isDeleteStep1Open, setIsDeleteStep1Open] = useState(false)
+  const [isDeleteStep2Open, setIsDeleteStep2Open] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const {
     register,
@@ -91,6 +96,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
   }
 
   const charCount = watch("bio")?.length || 0
+  const canConfirmDelete = deleteConfirmText.trim().toLowerCase() === (profile.username || "").toLowerCase()
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -169,6 +175,115 @@ export function ProfileForm({ profile }: ProfileFormProps) {
           Cancel
         </Button>
       </div>
+
+      {/* Danger zone */}
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold">Danger zone</div>
+          <div className="text-sm text-muted-foreground">
+            Deleting your account is permanent. Your profile and saved spots will be deleted.
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <Button type="button" variant="destructive" onClick={() => setIsDeleteStep1Open(true)}>
+            Delete account
+          </Button>
+        </div>
+      </div>
+
+      {/* Delete step 1 */}
+      <Dialog open={isDeleteStep1Open} onOpenChange={setIsDeleteStep1Open}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete your account?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              This will permanently delete your account and associated data. This action cannot be undone.
+            </p>
+            <p className="text-muted-foreground">
+              Next step: you’ll confirm by typing your username.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsDeleteStep1Open(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsDeleteStep1Open(false)
+                setDeleteConfirmText("")
+                setIsDeleteStep2Open(true)
+              }}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete step 2 */}
+      <Dialog open={isDeleteStep2Open} onOpenChange={setIsDeleteStep2Open}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Type your username to confirm</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Enter <span className="font-medium text-foreground">@{profile.username}</span> to permanently delete your account.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirm">Username</Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder={profile.username}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsDeleteStep2Open(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!canConfirmDelete || isDeleting}
+              onClick={async () => {
+                if (!user) return
+                setIsDeleting(true)
+                try {
+                  const res = await fetch("/api/account/delete", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ confirmUsername: deleteConfirmText }),
+                  })
+                  const data = await res.json().catch(() => ({}))
+                  if (!res.ok) {
+                    throw new Error(data?.message || data?.error || "Failed to delete account")
+                  }
+                  toast.success("Account deleted")
+                  setIsDeleteStep2Open(false)
+                  await signOut()
+                  router.push("/")
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : "Failed to delete account"
+                  toast.error(msg)
+                } finally {
+                  setIsDeleting(false)
+                }
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Permanently delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }
