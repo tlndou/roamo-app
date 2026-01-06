@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ChevronRight, ExternalLink, Trash2 } from "lucide-react"
+import { ChevronRight, ExternalLink, Trash2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
@@ -119,7 +119,7 @@ export function ListView({
       {items.map((spot) => (
         <div
           key={spot.id}
-          className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
+          className="group relative flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/50"
           role="button"
           tabIndex={0}
           onClick={() => onSpotClick(spot)}
@@ -176,6 +176,15 @@ export function ListView({
 
             {/* Intentionally do not show comments/description in List/Explore cards */}
           </div>
+
+          {/* Visited indicator */}
+          {spot.visited && (
+            <div className="absolute bottom-2 right-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
+                <Check className="h-4 w-4 text-white" />
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
