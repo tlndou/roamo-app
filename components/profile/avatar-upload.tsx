@@ -101,7 +101,7 @@ export function AvatarUpload({ currentAvatarUrl, onImageSelect, onRemove, displa
       <div className="relative">
         <Avatar className="h-24 w-24">
           {avatarSrc ? <AvatarImage src={avatarSrc} alt={displayName || "Avatar"} /> : null}
-          <AvatarFallback className="text-2xl font-semibold text-muted-foreground ring-1 ring-border" delayMs={0}>
+          <AvatarFallback className="text-2xl font-semibold text-muted-foreground" delayMs={0}>
             {initials}
           </AvatarFallback>
         </Avatar>

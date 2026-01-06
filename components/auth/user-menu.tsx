@@ -30,10 +30,10 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring rounded-full">
+        <button className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
           <Avatar>
             {profile.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={displayName} />}
-            <AvatarFallback className="font-semibold text-muted-foreground ring-1 ring-border">{initials}</AvatarFallback>
+            <AvatarFallback className="bg-muted font-semibold text-foreground">{initials}</AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>

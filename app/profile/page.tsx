@@ -86,7 +86,7 @@ export default function ProfilePage() {
         <div className="mb-8 flex items-center gap-6">
           <Avatar className="h-24 w-24">
             {profile.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={displayName} />}
-            <AvatarFallback className="text-2xl font-semibold text-muted-foreground ring-1 ring-border">{initials}</AvatarFallback>
+            <AvatarFallback className="text-2xl font-semibold text-muted-foreground">{initials}</AvatarFallback>
           </Avatar>
           <div>
             <h1 className="text-3xl font-semibold">{displayName}</h1>
