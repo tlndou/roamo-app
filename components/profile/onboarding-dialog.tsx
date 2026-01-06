@@ -159,6 +159,9 @@ export function OnboardingDialog() {
             <p className="text-xs text-muted-foreground">
               Lowercase letters, numbers, and underscores only. 3-20 characters.
             </p>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium">Note:</span> You won’t be able to change your username later.
+            </p>
           </div>
 
           {/* Birthdate */}
