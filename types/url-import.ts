@@ -30,6 +30,12 @@ export interface ImportSignals {
     city?: string
     country?: string
   }
+  pinterest?: {
+    pinTitle?: string
+    pinDescription?: string
+    destinationUrl?: string
+    inferredEvidence?: string[]
+  }
 }
 
 export interface FieldConfidence {
@@ -81,6 +87,7 @@ export interface SpotDraft {
   customImage?: string
   iconColor: IconColor
   visited: boolean
+  rating?: number
 }
 
 export interface URLImportResult {

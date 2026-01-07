@@ -3,6 +3,7 @@ import { detectProvider } from "./provider-matcher"
 import { GoogleMapsExtractor } from "./extractors/google-maps"
 import { GoogleMapsUrlOnlyExtractor } from "./extractors/google-maps-url-only"
 import { SocialMediaExtractor } from "./extractors/social-media"
+import { PinterestExtractor } from "./extractors/pinterest"
 import { GenericWebsiteExtractor } from "./extractors/generic-website"
 import { URLImportResult } from "@/types/url-import"
 import { ProviderExtractor } from "@/types/providers"
@@ -19,6 +20,7 @@ export class URLExtractor {
       // Always handle Google Maps with a provider-specific extractor.
       // If we don't have an API key, we still do URL-only parsing and require confirmation.
       ["google_maps", googleApiKey ? new GoogleMapsExtractor(googleApiKey) : new GoogleMapsUrlOnlyExtractor(false)],
+      ["pinterest", new PinterestExtractor(googleApiKey)],
       ["instagram", new SocialMediaExtractor()],
       ["tiktok", new SocialMediaExtractor()],
     ])

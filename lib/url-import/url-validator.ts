@@ -55,7 +55,7 @@ export function validateURL(urlString: string): URL {
 
 export async function resolveShortLink(url: URL): Promise<URL> {
   // Include Google Maps short links. These often expand to google.com/maps/... URLs we can parse.
-  const shortLinkDomains = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "ow.ly", "maps.app.goo.gl"]
+  const shortLinkDomains = ["bit.ly", "t.co", "goo.gl", "tinyurl.com", "ow.ly", "maps.app.goo.gl", "pin.it"]
 
   if (!shortLinkDomains.includes(url.hostname)) {
     return url // Not a short link

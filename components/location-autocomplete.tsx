@@ -153,7 +153,13 @@ export function LocationAutocomplete({
           required={required}
           className="pl-9"
           onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onBlur={(e) => {
+            // If focus is moving to an element inside the results (a button), don't instantly close.
+            const next = e.relatedTarget as Node | null
+            if (next && wrapperRef.current?.contains(next)) return
+            setIsFocused(false)
+            setShowResults(false)
+          }}
         />
         {isLoading && (
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -174,7 +180,11 @@ export function LocationAutocomplete({
                 <button
                   key={index}
                   type="button"
-                  onClick={() => handleSelect(result)}
+                  // Select on mousedown so the blur on the input doesn't dismiss the menu before click fires.
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    handleSelect(result)
+                  }}
                   className={cn(
                     "w-full rounded-sm px-3 py-2 text-left text-sm transition-colors",
                     "hover:bg-accent hover:text-accent-foreground",

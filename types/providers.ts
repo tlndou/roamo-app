@@ -4,6 +4,7 @@ export type ProviderType =
   | "google_maps"
   | "instagram"
   | "tiktok"
+  | "pinterest"
   | "official_website"
   | "unknown"
 

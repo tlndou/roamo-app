@@ -20,6 +20,16 @@ export function detectProvider(url: URL): ProviderMatch {
     }
   }
 
+  // Pinterest (proxy source)
+  if (hostname.includes("pinterest.com") || hostname.includes("pin.it")) {
+    const pinId = pathname.match(/\/pin\/(\d+)/)?.[1]
+    return {
+      type: "pinterest",
+      confidence: "medium",
+      handle: pinId, // Reuse handle field for pinId
+    }
+  }
+
   // Instagram
   if (hostname.includes("instagram.com")) {
     const handle = pathname.split("/")[1]
