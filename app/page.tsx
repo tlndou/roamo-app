@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddSpotDialog } from "@/components/add-spot-dialog"
@@ -145,7 +145,10 @@ export default function Home() {
     }
   }
 
-  const filteredSpots = selectedCategory === "all" ? spots : spots.filter((s) => s.category === selectedCategory)
+  const filteredSpots = useMemo(() => {
+    if (selectedCategory === "all") return spots
+    return spots.filter((s) => s.category === selectedCategory)
+  }, [spots, selectedCategory])
 
   // Loading state
   if (authLoading || loading) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ListView } from "@/components/list-view"
@@ -141,7 +141,10 @@ export default function VisitedPage() {
     }
   }
 
-  const filteredSpots = selectedCategory === "all" ? spots : spots.filter((s) => s.category === selectedCategory)
+  const filteredSpots = useMemo(() => {
+    if (selectedCategory === "all") return spots
+    return spots.filter((s) => s.category === selectedCategory)
+  }, [spots, selectedCategory])
 
   // Loading state
   if (authLoading || loading) {
