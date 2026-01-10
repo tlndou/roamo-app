@@ -15,7 +15,8 @@ interface NavigationState {
   level: "continent" | "country" | "city" | "spots"
   continent?: string
   country?: string
-  city?: string
+  cityId?: string
+  cityName?: string
 }
 
 interface MapViewProps {
@@ -185,8 +186,8 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
         if (navigation.country) {
           filteredSpots = filteredSpots.filter((s) => s.country === navigation.country)
         }
-        if (navigation.city) {
-          filteredSpots = filteredSpots.filter((s) => s.city === navigation.city)
+        if (navigation.cityId) {
+          filteredSpots = filteredSpots.filter((s) => cityIdOf(s) === navigation.cityId)
         }
       }
 
@@ -237,8 +238,8 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
     if (navigation.country) {
       filtered = filtered.filter((s) => s.country === navigation.country)
     }
-    if (navigation.city) {
-      filtered = filtered.filter((s) => s.city === navigation.city)
+    if (navigation.cityId) {
+      filtered = filtered.filter((s) => cityIdOf(s) === navigation.cityId)
     }
     return filtered
   }, [spots, navigation])
@@ -251,7 +252,7 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
     return visibleSpots.length - visibleSpotsWithCoords.length
   }, [visibleSpots, visibleSpotsWithCoords])
 
-  const mode: "city_compare" | "city_detail" = navigation?.city ? "city_detail" : "city_compare"
+  const mode: "city_compare" | "city_detail" = navigation?.cityId ? "city_detail" : "city_compare"
 
   if (!isMounted) {
     return (
@@ -327,30 +328,29 @@ function MapMarkers({
 }) {
   const { useMap } = require("react-leaflet")
   const map = useMap()
-  const [clusters, setClusters] = useState<Cluster[]>([])
+  const [mapTick, setMapTick] = useState(0)
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const recompute = () => {
-      if (mode === "city_compare") {
-        setClusters(computeCityClusters(spots))
-        return
-      }
-
-      const z = map.getZoom?.() ?? 0
-      const threshold = z >= 14 ? 14 : z >= 11 ? 22 : 30
-      setClusters(computePixelClusters(spots, map, threshold))
-    }
-
-    recompute()
-    map.on("zoomend", recompute)
-    map.on("moveend", recompute)
+    const bump = () => setMapTick((t) => t + 1)
+    bump()
+    map.on("zoomend", bump)
+    map.on("moveend", bump)
     return () => {
-      map.off("zoomend", recompute)
-      map.off("moveend", recompute)
+      map.off("zoomend", bump)
+      map.off("moveend", bump)
     }
-  }, [mode, spots, map])
+  }, [map])
+
+  const clusters: Cluster[] = useMemo(() => {
+    if (mode === "city_compare") return computeCityClusters(spots)
+
+    const z = map.getZoom?.() ?? 0
+    const threshold = z >= 14 ? 14 : z >= 11 ? 22 : 30
+    return computePixelClusters(spots, map, threshold)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, spots, map, mapTick])
 
   return (
     <>

@@ -163,6 +163,9 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
                 setDraft({
                   ...draft,
                   city: location.city,
+                  canonicalCityId: location.canonicalCityId,
+                  neighborhood: location.neighborhood ?? draft.neighborhood,
+                  adminArea: location.adminArea ?? draft.adminArea,
                   country: location.country,
                   continent,
                   address: location.address ?? draft.address,

@@ -20,13 +20,16 @@ interface NavigationState {
   level: "continent" | "country" | "city" | "spots"
   continent?: string
   country?: string
-  city?: string
+  cityId?: string
+  cityName?: string
 }
 
 function deriveInitialNavigation(spots: Spot[]): NavigationState {
   if (spots.length === 0) return { level: "continent" }
 
   const continentOf = (s: Spot) => s.continent || getCountryContinent(s.country)
+  const cityIdOf = (s: Spot) => s.canonicalCityId || ""
+  const cityNameOf = (s: Spot) => s.city
 
   const continents = Array.from(new Set(spots.map(continentOf).filter(Boolean)))
   if (continents.length !== 1) return { level: "continent" }
@@ -38,11 +41,12 @@ function deriveInitialNavigation(spots: Spot[]): NavigationState {
 
   const country = countries[0]
   const countrySpots = continentSpots.filter((s) => s.country === country)
-  const cities = Array.from(new Set(countrySpots.map((s) => s.city).filter(Boolean)))
-  if (cities.length !== 1) return { level: "city", continent, country }
+  const cityIds = Array.from(new Set(countrySpots.map(cityIdOf).filter(Boolean)))
+  if (cityIds.length !== 1) return { level: "city", continent, country }
 
-  const city = cities[0]
-  return { level: "spots", continent, country, city }
+  const cityId = cityIds[0]
+  const cityName = countrySpots.find((s) => cityIdOf(s) === cityId)?.city || cityNameOf(countrySpots[0])
+  return { level: "spots", continent, country, cityId, cityName }
 }
 
 export default function Home() {

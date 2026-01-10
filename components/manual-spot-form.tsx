@@ -46,6 +46,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     category: "restaurant" as SpotCategory,
     name: "",
     city: "",
+    canonicalCityId: "",
     country: "",
     continent: "",
     address: "",
@@ -56,6 +57,8 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     iconColor: "grey" as IconColor,
     link: "",
     visited: false,
+    neighborhood: "",
+    adminArea: "",
   })
 
   const canSubmit =
@@ -110,7 +113,10 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
 
   const handleLocationSelect = (location: {
     city: string
+    canonicalCityId: string
     country: string
+    neighborhood?: string
+    adminArea?: string
     address?: string
     coordinates: { lat: number; lng: number }
   }) => {
@@ -120,6 +126,9 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
     setFormData({
       ...formData,
       city: location.city,
+      canonicalCityId: location.canonicalCityId,
+      neighborhood: location.neighborhood || "",
+      adminArea: location.adminArea || "",
       country: location.country,
       continent,
       address: location.address || "",

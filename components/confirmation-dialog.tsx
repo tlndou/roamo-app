@@ -148,6 +148,9 @@ export function ConfirmationDialog({
                 setEditedDraft({
                   ...editedDraft,
                   city: location.city || editedDraft.city,
+                  canonicalCityId: location.canonicalCityId,
+                  neighborhood: location.neighborhood ?? editedDraft.neighborhood,
+                  adminArea: location.adminArea ?? editedDraft.adminArea,
                   country: location.country || editedDraft.country,
                   continent,
                   address: location.address || editedDraft.address,

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client"
 import type { Spot } from "@/types/spot"
 import type { Database } from "@/types/supabase"
+import { canonicalizeCity } from "@/lib/geo/canonical-city"
 
 type DbSpot = Database["public"]["Tables"]["spots"]["Row"]
 type InsertSpot = Database["public"]["Tables"]["spots"]["Insert"]
@@ -8,11 +9,15 @@ type UpdateSpot = Database["public"]["Tables"]["spots"]["Update"]
 
 // Transform DB spot to app Spot type
 export function transformDbSpot(dbSpot: DbSpot): Spot {
+  const canon = canonicalizeCity({ city: dbSpot.canonical_city ?? dbSpot.city, country: dbSpot.country })
   return {
     id: dbSpot.id,
     category: dbSpot.category as Spot["category"],
     name: dbSpot.name,
     city: dbSpot.city,
+    canonicalCityId: dbSpot.canonical_city_id ?? canon.canonicalCityId,
+    neighborhood: dbSpot.neighborhood ?? undefined,
+    adminArea: dbSpot.admin_area ?? undefined,
     country: dbSpot.country,
     continent: dbSpot.continent,
     address: dbSpot.address ?? undefined,
@@ -32,11 +37,16 @@ export function transformDbSpot(dbSpot: DbSpot): Spot {
 
 // Transform app Spot to DB insert format
 export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
+  const canon = canonicalizeCity({ city: spot.city, country: spot.country })
   return {
     user_id: userId,
     category: spot.category,
     name: spot.name,
     city: spot.city,
+    canonical_city: spot.city,
+    canonical_city_id: spot.canonicalCityId ?? canon.canonicalCityId,
+    neighborhood: spot.neighborhood ?? null,
+    admin_area: spot.adminArea ?? null,
     country: spot.country,
     continent: spot.continent,
     address: spot.address ?? null,
@@ -53,10 +63,15 @@ export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
 }
 
 export function transformToDbSpotUpdate(spot: Spot): UpdateSpot {
+  const canon = canonicalizeCity({ city: spot.city, country: spot.country })
   return {
     category: spot.category,
     name: spot.name,
     city: spot.city,
+    canonical_city: spot.city,
+    canonical_city_id: spot.canonicalCityId ?? canon.canonicalCityId,
+    neighborhood: spot.neighborhood ?? null,
+    admin_area: spot.adminArea ?? null,
     country: spot.country,
     continent: spot.continent,
     address: spot.address ?? null,

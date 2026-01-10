@@ -21,7 +21,23 @@ export interface Spot {
   id: string
   category: SpotCategory
   name: string
+  /**
+   * Canonical metro city name (user-facing for browsing).
+   * Borough/district names should not be stored here.
+   */
   city: string
+  /**
+   * Stable metro city identifier used for grouping/searching.
+   */
+  canonicalCityId?: string
+  /**
+   * Stored internally for possible future use; must NOT affect browsing/grouping.
+   */
+  neighborhood?: string
+  /**
+   * Stored internally for possible future use; must NOT affect browsing/grouping.
+   */
+  adminArea?: string
   country: string
   continent: string
   address?: string
