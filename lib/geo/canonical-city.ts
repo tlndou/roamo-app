@@ -1,4 +1,4 @@
-import { normalizeCountryName } from "@/lib/country-utils"
+import { canonicalizeCountryName } from "@/lib/country-utils"
 
 export type CanonicalCityResult = {
   canonicalCity: string
@@ -61,7 +61,7 @@ export function canonicalizeCity(input: { city: string; country: string }): Cano
   evidence.push(...cleaned.evidence)
 
   const canonicalCity = cleaned.value || (input.city || "").trim() || "Unknown"
-  const country = normalizeCountryName(input.country || "")
+  const country = canonicalizeCountryName(input.country || "")
   const canonicalCityId = slugify(`${canonicalCity}-${country}`)
   evidence.push("city_id:slugify(city+normalized_country)")
 

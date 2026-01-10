@@ -226,23 +226,84 @@ const countryToContinentMap: Record<string, string> = {
 }
 
 export function getCountryContinent(country: string): string {
-  const normalized = country.toLowerCase().trim()
+  const canonical = canonicalizeCountryName(country)
+  const normalized = canonical.toLowerCase().trim()
   return countryToContinentMap[normalized] || "Other"
 }
 
+function stripDiacritics(input: string): string {
+  return input.normalize("NFD").replace(/\p{Diacritic}+/gu, "")
+}
+
+function cleanToken(input: string): string {
+  return stripDiacritics(input)
+    .toLowerCase()
+    .trim()
+    .replace(/[.]/g, "")
+    .replace(/['’]/g, "")
+    .replace(/\s+/g, " ")
+}
+
+// Global, rule-based aliases (not city-specific).
+const countryAliases: Record<string, string> = {
+  // UK
+  uk: "United Kingdom",
+  "u k": "United Kingdom",
+  gb: "United Kingdom",
+  "great britain": "United Kingdom",
+  britain: "United Kingdom",
+  "united kingdom of great britain and northern ireland": "United Kingdom",
+
+  // US
+  us: "United States",
+  usa: "United States",
+  "u s": "United States",
+  "united states of america": "United States",
+
+  // Common non-English/alt spellings
+  brasil: "Brazil",
+  "cote d ivoire": "Côte d’Ivoire",
+  "cote d'ivoire": "Côte d’Ivoire",
+  "ivory coast": "Côte d’Ivoire",
+}
+
+/**
+ * Canonicalize country strings globally.
+ * - Handles common aliases (UK/GB/USA/etc)
+ * - Handles ISO-3166 alpha-2 codes via Intl.DisplayNames when available
+ * - Normalizes punctuation/diacritics for alias matching
+ */
+export function canonicalizeCountryName(country: string): string {
+  const raw = (country || "").trim()
+  if (!raw) return "Unknown"
+
+  const token = cleanToken(raw)
+  if (countryAliases[token]) return countryAliases[token]
+
+  // ISO alpha-2 code support (e.g. "GB" -> "United Kingdom")
+  const code = token.replace(/\s+/g, "").toUpperCase()
+  const alpha2 = /^[A-Z]{2}$/.test(code) ? code : null
+  if (alpha2) {
+    const normalizedCode = alpha2 === "UK" ? "GB" : alpha2
+    try {
+      // In Node this is available; in browsers it is usually available too.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dn = new (Intl as any).DisplayNames(["en"], { type: "region" })
+      const name = dn.of(normalizedCode)
+      if (typeof name === "string" && name.trim() && name.toUpperCase() !== normalizedCode) {
+        return name.trim()
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // If it's already a plain English country name, leave it as-is.
+  // (We do not attempt fuzzy matching here to avoid surprising rewrites.)
+  return raw
+}
+
+// Backwards compatibility: keep old export name, but return canonical values.
 export function normalizeCountryName(country: string): string {
-  const normalized = country.toLowerCase().trim()
-
-  // Normalize GB to UK
-  if (normalized === "gb" || normalized === "great britain" || normalized === "britain") {
-    return "UK"
-  }
-
-  // Normalize United States variations
-  if (normalized === "us" || normalized === "usa" || normalized === "united states of america") {
-    return "United States"
-  }
-
-  // Return original if no normalization needed
-  return country
+  return canonicalizeCountryName(country)
 }
