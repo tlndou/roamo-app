@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { reverseGeocodeNominatim } from "@/lib/geo/reverse-geocode"
 import { canonicalizeCity } from "@/lib/geo/canonical-city"
+import { canonicalizeCountryName } from "@/lib/country-utils"
 
 interface LocationResult {
   display_name: string
@@ -51,6 +52,11 @@ interface LocationAutocompleteProps {
   onLocationSelect: (location: LocationData) => void
   placeholder?: string
   required?: boolean
+  /**
+   * - "place": allow selecting specific places/addresses (default; used for spots)
+   * - "city": restrict to city/town-level selections (used for base location; no street addresses)
+   */
+  mode?: "place" | "city"
 }
 
 export function LocationAutocomplete({
@@ -59,11 +65,13 @@ export function LocationAutocomplete({
   onLocationSelect,
   placeholder = "Search for a city or location...",
   required = false,
+  mode = "place",
 }: LocationAutocompleteProps) {
   const [results, setResults] = useState<LocationResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -98,22 +106,58 @@ export function LocationAutocomplete({
 
     debounceRef.current = setTimeout(async () => {
       setIsLoading(true)
+      setSearchError(null)
       try {
+        const cityOnly = mode === "city"
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?` +
             `q=${encodeURIComponent(value)}&` +
             `format=jsonv2&` +
             `addressdetails=1&` +
-            `limit=5`,
+            // IMPORTANT: do NOT use `featuretype=city` here. Major cities (e.g. London)
+            // are often returned as administrative boundaries, and this filter can make them disappear.
+            `limit=${cityOnly ? 8 : 5}`,
           {
             headers: {
               "User-Agent": "TravelSpotsApp/1.0",
             },
           }
         )
-        const data: LocationResult[] = await response.json()
+        const json = await response.json().catch(() => null)
+        const raw: LocationResult[] = Array.isArray(json) ? (json as LocationResult[]) : []
+
+        if (!response.ok) {
+          const msg =
+            (json && typeof json === "object" && "error" in (json as any) && String((json as any).error)) ||
+            `HTTP ${response.status}`
+          throw new Error(msg)
+        }
+
+        // Post-filter for city-only mode: allow city/town/admin boundary results,
+        // but avoid detailed street addresses.
+        const data: LocationResult[] = cityOnly
+          ? raw.filter((r) => {
+              const country = r.address.country || ""
+              if (!country) return false
+
+              // Reject street-level results
+              if (r.address.road || r.address.house_number) return false
+
+              const cityLike =
+                r.address.city ||
+                r.address.town ||
+                r.address.village ||
+                r.address.municipality ||
+                r.address.county ||
+                r.address.state_district ||
+                r.address.region ||
+                r.address.state ||
+                ""
+              return Boolean(cityLike)
+            })
+          : raw
         // If the user is typing a city-level query (no digits), de-dupe to one canonical metro city per country.
-        const isCityQuery = !/\d/.test(value.trim())
+        const isCityQuery = cityOnly ? true : !/\d/.test(value.trim())
         if (!isCityQuery) {
           setResults(data)
         } else {
@@ -132,7 +176,7 @@ export function LocationAutocomplete({
               ""
             const country = r.address.country || ""
             if (!cityLike || !country) continue
-            const canon = canonicalizeCity({ city: cityLike, country })
+            const canon = canonicalizeCity({ city: cityLike, country: canonicalizeCountryName(country) })
             if (seen.has(canon.canonicalCityId)) continue
             seen.add(canon.canonicalCityId)
             deduped.push(r)
@@ -143,6 +187,8 @@ export function LocationAutocomplete({
       } catch (error) {
         console.error("Geocoding error:", error)
         setResults([])
+        setSearchError("Couldn’t load location suggestions. Check your connection and try again.")
+        setShowResults(true)
       } finally {
         setIsLoading(false)
       }
@@ -156,14 +202,18 @@ export function LocationAutocomplete({
   }, [value, isFocused])
 
   const handleSelect = (result: LocationResult) => {
-    const country = result.address.country || ""
+    const country = canonicalizeCountryName(result.address.country || "")
 
-    // Extract street address if available for more precise locations
-    const streetParts = [
-      result.address.house_number,
-      result.address.road,
-    ].filter((part): part is string => Boolean(part))
-    const streetAddress = streetParts.length > 0 ? streetParts.join(" ") : undefined
+    // Extract street address if available for more precise locations (disabled for city-only mode)
+    const streetAddress =
+      mode === "city"
+        ? undefined
+        : (() => {
+            const streetParts = [result.address.house_number, result.address.road].filter(
+              (part): part is string => Boolean(part),
+            )
+            return streetParts.length > 0 ? streetParts.join(" ") : undefined
+          })()
 
     const coords = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) }
 
@@ -176,6 +226,12 @@ export function LocationAutocomplete({
         const metro = canonicalizeCity({ city: metroRaw || value, country }).canonicalCity
         const canon = canonicalizeCity({ city: metro, country })
 
+        const isCityQuery = mode === "city" ? true : !/\d/.test(value.trim())
+        const nextValue = isCityQuery ? `${metro}, ${country}` : result.display_name
+
+        // IMPORTANT: call onChange before onLocationSelect so parent handlers that "clear"
+        // form state on typing don't wipe the selection we are about to apply.
+        onChange(nextValue)
         onLocationSelect({
           city: metro,
           canonicalCityId: canon.canonicalCityId,
@@ -186,9 +242,6 @@ export function LocationAutocomplete({
           coordinates: coords,
           displayName: result.display_name,
         })
-
-        const isCityQuery = !/\d/.test(value.trim())
-        onChange(isCityQuery ? `${metro}, ${country}` : result.display_name)
       } catch {
         // Fallback: use best-effort city-like label, still canonicalized.
         const cityLike =
@@ -203,6 +256,8 @@ export function LocationAutocomplete({
           ""
         const metro = canonicalizeCity({ city: cityLike || value, country }).canonicalCity
         const canon = canonicalizeCity({ city: metro, country })
+        const nextValue = mode === "city" ? `${metro}, ${country}` : result.display_name
+        onChange(nextValue)
         onLocationSelect({
           city: metro,
           canonicalCityId: canon.canonicalCityId,
@@ -211,7 +266,6 @@ export function LocationAutocomplete({
           coordinates: coords,
           displayName: result.display_name,
         })
-        onChange(result.display_name)
       } finally {
         setIsLoading(false)
       }
@@ -249,7 +303,7 @@ export function LocationAutocomplete({
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg">
           <div className="max-h-[300px] overflow-y-auto p-1">
             {results.map((result, index) => {
-              const isCityQuery = !/\d/.test(value.trim())
+              const isCityQuery = mode === "city" ? true : !/\d/.test(value.trim())
               const cityLike =
                 result.address.city ||
                 result.address.town ||
@@ -262,12 +316,13 @@ export function LocationAutocomplete({
                 ""
               // Split display_name to show primary location and full address
               const displayParts = result.display_name.split(", ")
+              const normalizedCountry = canonicalizeCountryName(result.address.country || "")
               const primaryName =
-                isCityQuery && cityLike && result.address.country
-                  ? canonicalizeCity({ city: cityLike, country: result.address.country }).canonicalCity
+                isCityQuery && cityLike && normalizedCountry
+                  ? canonicalizeCity({ city: cityLike, country: normalizedCountry }).canonicalCity
                   : displayParts[0] // e.g., "Eiffel Tower"
               const secondaryInfo = displayParts.slice(1, 3).join(", ") // e.g., "Avenue Anatole France, 7th Arrondissement"
-              const country = result.address.country
+              const country = normalizedCountry
 
               return (
                 <button
@@ -304,7 +359,7 @@ export function LocationAutocomplete({
 
       {showResults && results.length === 0 && !isLoading && value.length >= 3 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-3 text-center text-sm text-muted-foreground shadow-lg">
-          No locations found
+          {searchError ? searchError : "No locations found"}
         </div>
       )}
     </div>

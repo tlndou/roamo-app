@@ -18,6 +18,8 @@ import { profileSchema, type ProfileFormData } from "@/lib/validations/profile"
 import { checkUsernameAvailable, updateProfile } from "@/lib/api/profiles"
 import { useAuth } from "@/components/providers/auth-provider"
 import { toast } from "sonner"
+import { LocationAutocomplete } from "@/components/location-autocomplete"
+import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
 
 export function OnboardingDialog() {
   const { user, profile, refreshProfile } = useAuth()
@@ -25,17 +27,24 @@ export function OnboardingDialog() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
+  const [baseLocationSearch, setBaseLocationSearch] = useState("")
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       displayName: "",
       username: "",
+      baseCity: "",
+      baseCountry: "",
+      baseCanonicalCityId: "",
+      baseLat: 0,
+      baseLng: 0,
       birthdate: "",
       bio: "",
     },
@@ -86,6 +95,13 @@ export function OnboardingDialog() {
       await updateProfile(user.id, {
         displayName: data.displayName,
         username: data.username,
+        baseLocation: {
+          city: data.baseCity,
+          country: data.baseCountry,
+          continent: getCountryContinent(data.baseCountry),
+          canonicalCityId: data.baseCanonicalCityId,
+          coordinates: { lat: data.baseLat, lng: data.baseLng },
+        },
         birthdate: data.birthdate,
         bio: data.bio || undefined,
       })
@@ -178,6 +194,55 @@ export function OnboardingDialog() {
             />
             {errors.birthdate && <p className="text-sm text-destructive">{errors.birthdate.message}</p>}
             <p className="text-xs text-muted-foreground">We'll use this to calculate your star sign</p>
+          </div>
+
+          {/* Base location */}
+          <div className="space-y-2">
+            <Label>
+              Which city/town are you based in? <span className="text-destructive">*</span>
+            </Label>
+
+            {/* Hidden fields registered for validation */}
+            <input type="hidden" {...register("baseCity")} />
+            <input type="hidden" {...register("baseCountry")} />
+            <input type="hidden" {...register("baseCanonicalCityId")} />
+            <input type="hidden" {...register("baseLat", { valueAsNumber: true })} />
+            <input type="hidden" {...register("baseLng", { valueAsNumber: true })} />
+
+            <LocationAutocomplete
+              value={baseLocationSearch}
+              onChange={(v) => {
+                setBaseLocationSearch(v)
+                // If user edits input manually, clear stored values until they select a dropdown option.
+                setValue("baseCity", "", { shouldValidate: true, shouldDirty: true })
+                setValue("baseCountry", "", { shouldValidate: true, shouldDirty: true })
+                setValue("baseCanonicalCityId", "", { shouldValidate: true, shouldDirty: true })
+                setValue("baseLat", 0, { shouldValidate: true, shouldDirty: true })
+                setValue("baseLng", 0, { shouldValidate: true, shouldDirty: true })
+              }}
+              onLocationSelect={(loc) => {
+                const country = canonicalizeCountryName(loc.country)
+                setBaseLocationSearch(`${loc.city}, ${country}`)
+                setValue("baseCity", loc.city, { shouldValidate: true, shouldDirty: true })
+                setValue("baseCountry", country, { shouldValidate: true, shouldDirty: true })
+                setValue("baseCanonicalCityId", loc.canonicalCityId, { shouldValidate: true, shouldDirty: true })
+                setValue("baseLat", loc.coordinates.lat, { shouldValidate: true, shouldDirty: true })
+                setValue("baseLng", loc.coordinates.lng, { shouldValidate: true, shouldDirty: true })
+              }}
+              placeholder="Search for a city or town..."
+              required
+              mode="city"
+            />
+
+            {(errors.baseCity || errors.baseCountry || errors.baseCanonicalCityId) && (
+              <p className="text-sm text-destructive">
+                {errors.baseCity?.message || errors.baseCountry?.message || errors.baseCanonicalCityId?.message}
+              </p>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              City/town only — we don’t collect detailed addresses.
+            </p>
           </div>
 
           {/* Submit Button */}

@@ -91,6 +91,11 @@ export default function ProfilePage() {
           <div>
             <h1 className="text-3xl font-semibold">{displayName}</h1>
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
+            {profile.baseLocation?.city && profile.baseLocation?.country && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                📍 {profile.baseLocation.city}, {profile.baseLocation.country}
+              </p>
+            )}
             {profile.bio && <p className="mt-2 text-sm">{profile.bio}</p>}
           </div>
         </div>

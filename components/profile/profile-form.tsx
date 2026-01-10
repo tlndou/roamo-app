@@ -16,6 +16,8 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { toast } from "sonner"
 import type { Profile } from "@/types/profile"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { LocationAutocomplete } from "@/components/location-autocomplete"
+import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
 
 interface ProfileFormProps {
   profile: Profile
@@ -28,6 +30,11 @@ export function ProfileForm({ profile }: ProfileFormProps) {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarRemoved, setAvatarRemoved] = useState(false)
   const [avatarDirty, setAvatarDirty] = useState(false)
+  const [baseLocationSearch, setBaseLocationSearch] = useState(() => {
+    const loc = profile.baseLocation
+    if (!loc?.city || !loc?.country) return ""
+    return `${loc.city}, ${loc.country}`
+  })
   const [isDeleteStep1Open, setIsDeleteStep1Open] = useState(false)
   const [isDeleteStep2Open, setIsDeleteStep2Open] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState("")
@@ -37,13 +44,19 @@ export function ProfileForm({ profile }: ProfileFormProps) {
     register,
     handleSubmit,
     watch,
-    formState: { errors, isDirty },
+    setValue,
+    formState: { errors, isDirty, dirtyFields },
     reset,
   } = useForm<ProfileEditFormData>({
     resolver: zodResolver(profileEditSchema),
     defaultValues: {
       displayName: profile.displayName || "",
       bio: profile.bio || "",
+      baseCity: profile.baseLocation?.city || "",
+      baseCountry: profile.baseLocation?.country || "",
+      baseCanonicalCityId: profile.baseLocation?.canonicalCityId || "",
+      baseLat: profile.baseLocation?.coordinates.lat ?? 0,
+      baseLng: profile.baseLocation?.coordinates.lng ?? 0,
     },
   })
 
@@ -65,11 +78,40 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         avatarUrl = await uploadAvatar(user.id, avatarFile)
       }
 
+      const baseLocationTouched = Boolean(
+        dirtyFields.baseCity ||
+          dirtyFields.baseCountry ||
+          dirtyFields.baseCanonicalCityId ||
+          dirtyFields.baseLat ||
+          dirtyFields.baseLng
+      )
+
+      const baseCity = (data.baseCity || "").trim()
+      const baseCountry = canonicalizeCountryName((data.baseCountry || "").trim())
+      const baseCanonicalCityId = (data.baseCanonicalCityId || "").trim()
+      const baseLat = Number(data.baseLat)
+      const baseLng = Number(data.baseLng)
+      const hasBaseLocation =
+        Boolean(baseCity && baseCountry && baseCanonicalCityId) && Number.isFinite(baseLat) && Number.isFinite(baseLng)
+
       // Update profile
       await updateProfile(user.id, {
         displayName: data.displayName,
         bio: data.bio || undefined,
         avatarUrl,
+        ...(baseLocationTouched
+          ? {
+              baseLocation: hasBaseLocation
+                ? {
+                    city: baseCity,
+                    country: baseCountry,
+                    continent: getCountryContinent(baseCountry),
+                    canonicalCityId: baseCanonicalCityId,
+                    coordinates: { lat: baseLat, lng: baseLng },
+                  }
+                : null,
+            }
+          : {}),
       })
 
       // Refresh profile data
@@ -134,6 +176,61 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         <p className="text-xs text-muted-foreground">
           Usernames can’t be changed once set.
         </p>
+      </div>
+
+      {/* Base location */}
+      <div className="space-y-2">
+        <Label>Which city/town are you based in?</Label>
+
+        {/* Hidden fields for form state */}
+        <input type="hidden" {...register("baseCity")} />
+        <input type="hidden" {...register("baseCountry")} />
+        <input type="hidden" {...register("baseCanonicalCityId")} />
+        <input type="hidden" {...register("baseLat", { valueAsNumber: true })} />
+        <input type="hidden" {...register("baseLng", { valueAsNumber: true })} />
+
+        <LocationAutocomplete
+          value={baseLocationSearch}
+          onChange={(v) => {
+            setBaseLocationSearch(v)
+            // Keep fields empty until the user selects a suggestion.
+            setValue("baseCity", "", { shouldDirty: true })
+            setValue("baseCountry", "", { shouldDirty: true })
+            setValue("baseCanonicalCityId", "", { shouldDirty: true })
+            setValue("baseLat", 0, { shouldDirty: true })
+            setValue("baseLng", 0, { shouldDirty: true })
+          }}
+          onLocationSelect={(loc) => {
+            const country = canonicalizeCountryName(loc.country)
+            setBaseLocationSearch(`${loc.city}, ${country}`)
+            setValue("baseCity", loc.city, { shouldDirty: true })
+            setValue("baseCountry", country, { shouldDirty: true })
+            setValue("baseCanonicalCityId", loc.canonicalCityId, { shouldDirty: true })
+            setValue("baseLat", loc.coordinates.lat, { shouldDirty: true })
+            setValue("baseLng", loc.coordinates.lng, { shouldDirty: true })
+          }}
+          placeholder="Search for a city or town..."
+          mode="city"
+        />
+
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">City/town only — we don’t collect detailed addresses.</p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setBaseLocationSearch("")
+              setValue("baseCity", "", { shouldDirty: true })
+              setValue("baseCountry", "", { shouldDirty: true })
+              setValue("baseCanonicalCityId", "", { shouldDirty: true })
+              setValue("baseLat", 0, { shouldDirty: true })
+              setValue("baseLng", 0, { shouldDirty: true })
+            }}
+          >
+            Clear
+          </Button>
+        </div>
       </div>
 
       {/* Bio */}

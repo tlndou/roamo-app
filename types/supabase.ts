@@ -12,6 +12,12 @@ export interface Database {
           username: string | null
           bio: string | null
           avatar_url: string | null
+          base_city: string | null
+          base_country: string | null
+          base_continent: string | null
+          base_canonical_city_id: string | null
+          base_lat: number | null
+          base_lng: number | null
           birthdate: string | null
           zodiac_sign: string | null
           created_at: string
@@ -25,6 +31,12 @@ export interface Database {
           username?: string | null
           bio?: string | null
           avatar_url?: string | null
+          base_city?: string | null
+          base_country?: string | null
+          base_continent?: string | null
+          base_canonical_city_id?: string | null
+          base_lat?: number | null
+          base_lng?: number | null
           birthdate?: string | null
           zodiac_sign?: string | null
         }
@@ -35,6 +47,12 @@ export interface Database {
           username?: string | null
           bio?: string | null
           avatar_url?: string | null
+          base_city?: string | null
+          base_country?: string | null
+          base_continent?: string | null
+          base_canonical_city_id?: string | null
+          base_lat?: number | null
+          base_lng?: number | null
           birthdate?: string | null
           zodiac_sign?: string | null
           updated_at?: string
@@ -47,6 +65,10 @@ export interface Database {
           category: string
           name: string
           city: string
+          canonical_city: string | null
+          canonical_city_id: string | null
+          neighborhood: string | null
+          admin_area: string | null
           country: string
           continent: string
           address: string | null
@@ -58,6 +80,7 @@ export interface Database {
           lat: number
           lng: number
           visited: boolean
+          rating: number | null
           created_at: string
           updated_at: string
         }
@@ -66,6 +89,10 @@ export interface Database {
           category: string
           name: string
           city: string
+          canonical_city?: string | null
+          canonical_city_id?: string | null
+          neighborhood?: string | null
+          admin_area?: string | null
           country: string
           continent: string
           address?: string | null
@@ -77,11 +104,16 @@ export interface Database {
           lat: number
           lng: number
           visited?: boolean
+          rating?: number | null
         }
         Update: {
           category?: string
           name?: string
           city?: string
+          canonical_city?: string | null
+          canonical_city_id?: string | null
+          neighborhood?: string | null
+          admin_area?: string | null
           country?: string
           continent?: string
           address?: string | null
@@ -93,6 +125,7 @@ export interface Database {
           lat?: number
           lng?: number
           visited?: boolean
+          rating?: number | null
           updated_at?: string
         }
       }

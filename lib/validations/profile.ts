@@ -1,5 +1,13 @@
 import { z } from "zod"
 
+const baseLocationSchema = z.object({
+  baseCity: z.string().min(1, "Base location is required"),
+  baseCountry: z.string().min(1, "Base location is required"),
+  baseCanonicalCityId: z.string().min(1, "Base location is required"),
+  baseLat: z.number(),
+  baseLng: z.number(),
+})
+
 export const profileSchema = z.object({
   displayName: z.string().min(1, "Display name is required").max(50, "Display name must be 50 characters or less"),
 
@@ -8,6 +16,9 @@ export const profileSchema = z.object({
     .min(3, "Username must be at least 3 characters")
     .max(20, "Username must be 20 characters or less")
     .regex(/^[a-z0-9_]+$/, "Username must be lowercase letters, numbers, or underscores"),
+
+  // Base location (city/town only)
+  ...baseLocationSchema.shape,
 
   birthdate: z.string().refine(
     (date) => {
@@ -28,6 +39,13 @@ export const profileEditSchema = z.object({
   displayName: z.string().min(1, "Display name is required").max(50, "Display name must be 50 characters or less"),
 
   bio: z.string().max(500, "Bio must be 500 characters or less").optional().nullable(),
+
+  // Base location is editable but optional here (older users may not have one set yet)
+  baseCity: z.string().optional(),
+  baseCountry: z.string().optional(),
+  baseCanonicalCityId: z.string().optional(),
+  baseLat: z.number().optional(),
+  baseLng: z.number().optional(),
 })
 
 export type ProfileEditFormData = z.infer<typeof profileEditSchema>

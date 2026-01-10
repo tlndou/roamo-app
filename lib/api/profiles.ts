@@ -2,16 +2,36 @@ import { createClient } from "@/lib/supabase/client"
 import { calculateZodiacSign } from "@/lib/zodiac-utils"
 import type { Profile, ProfileUpdate } from "@/types/profile"
 import type { Database } from "@/types/supabase"
+import { canonicalizeCity } from "@/lib/geo/canonical-city"
+import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
 
 type DbProfile = Database["public"]["Tables"]["profiles"]["Row"]
 
 // Transform DB profile to app Profile type
 export function transformDbProfile(dbProfile: DbProfile): Profile {
+  const baseCity = (dbProfile.base_city || "").trim()
+  const baseCountry = canonicalizeCountryName(dbProfile.base_country || "")
+  const hasBaseCoords = dbProfile.base_lat != null && dbProfile.base_lng != null
+  const baseCanonical =
+    baseCity && baseCountry
+      ? canonicalizeCity({ city: baseCity, country: baseCountry }).canonicalCityId
+      : ""
+
   return {
     id: dbProfile.id,
     email: dbProfile.email,
     displayName: dbProfile.display_name,
     username: dbProfile.username || "",
+    baseLocation:
+      baseCity && baseCountry && hasBaseCoords
+        ? {
+            city: baseCity,
+            country: baseCountry,
+            continent: dbProfile.base_continent || getCountryContinent(baseCountry),
+            canonicalCityId: dbProfile.base_canonical_city_id || baseCanonical,
+            coordinates: { lat: Number(dbProfile.base_lat), lng: Number(dbProfile.base_lng) },
+          }
+        : null,
     bio: dbProfile.bio,
     avatarUrl: dbProfile.avatar_url,
     birthdate: dbProfile.birthdate,
@@ -44,6 +64,29 @@ export async function updateProfile(userId: string, updates: ProfileUpdate): Pro
   if (updates.username !== undefined) dbUpdates.username = updates.username.toLowerCase()
   if (updates.bio !== undefined) dbUpdates.bio = updates.bio
   if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl
+  if (updates.baseLocation !== undefined) {
+    if (updates.baseLocation === null) {
+      dbUpdates.base_city = null
+      dbUpdates.base_country = null
+      dbUpdates.base_continent = null
+      dbUpdates.base_canonical_city_id = null
+      dbUpdates.base_lat = null
+      dbUpdates.base_lng = null
+    } else {
+      const city = updates.baseLocation.city?.trim() || "Unknown"
+      const country = canonicalizeCountryName(updates.baseLocation.country || "")
+      const continent = updates.baseLocation.continent || getCountryContinent(country)
+      const canon = updates.baseLocation.canonicalCityId || canonicalizeCity({ city, country }).canonicalCityId
+      const lat = Number(updates.baseLocation.coordinates?.lat)
+      const lng = Number(updates.baseLocation.coordinates?.lng)
+      dbUpdates.base_city = city
+      dbUpdates.base_country = country
+      dbUpdates.base_continent = continent
+      dbUpdates.base_canonical_city_id = canon
+      dbUpdates.base_lat = Number.isFinite(lat) ? lat : null
+      dbUpdates.base_lng = Number.isFinite(lng) ? lng : null
+    }
+  }
   if (updates.birthdate !== undefined) {
     dbUpdates.birthdate = updates.birthdate
     dbUpdates.zodiac_sign = calculateZodiacSign(updates.birthdate)
