@@ -2,7 +2,6 @@
 
 import { useMemo, useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { MapPin } from "lucide-react"
 import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
 
@@ -52,6 +51,109 @@ const createCustomIcon = (count: number) => {
     iconSize: [Math.max(32, 24 + count * 2), Math.max(32, 24 + count * 2)],
     iconAnchor: [Math.max(16, 12 + count), Math.max(16, 12 + count)],
   })
+}
+
+const createSpotIcon = () => {
+  if (typeof window === "undefined") return undefined
+  const L = require("leaflet")
+  return L.divIcon({
+    className: "spot-marker",
+    html: `
+      <div style="
+        background: hsl(var(--primary));
+        width: 14px;
+        height: 14px;
+        border-radius: 9999px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        border: 2px solid white;
+      "></div>
+    `,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  })
+}
+
+type Cluster = {
+  key: string
+  coords: { lat: number; lng: number }
+  spots: Spot[]
+  label?: string
+}
+
+function cityIdOf(spot: Spot): string {
+  return spot.canonicalCityId || `${spot.city}|${spot.country}`
+}
+
+function cityLabelOf(spot: Spot): string {
+  return `${spot.city}, ${spot.country}`
+}
+
+function computeCityClusters(spots: Spot[]): Cluster[] {
+  const byCity: Record<string, { label: string; spots: Spot[] }> = {}
+  for (const s of spots) {
+    const id = cityIdOf(s)
+    if (!byCity[id]) byCity[id] = { label: cityLabelOf(s), spots: [] }
+    byCity[id].spots.push(s)
+  }
+
+  // Display-only centroid placement for city comparison markers.
+  return Object.entries(byCity).map(([id, v]) => {
+    const sum = v.spots.reduce(
+      (acc, s) => ({ lat: acc.lat + Number(s.coordinates.lat), lng: acc.lng + Number(s.coordinates.lng) }),
+      { lat: 0, lng: 0 },
+    )
+    const n = v.spots.length || 1
+    return {
+      key: `city:${id}`,
+      coords: { lat: sum.lat / n, lng: sum.lng / n },
+      spots: v.spots,
+      label: v.label,
+    }
+  })
+}
+
+function computePixelClusters(spots: Spot[], map: any, thresholdPx: number): Cluster[] {
+  if (!spots.length) return []
+  const L = require("leaflet")
+  const zoom = map.getZoom()
+  const pts = spots.map((s) => {
+    const lat = Number(s.coordinates.lat)
+    const lng = Number(s.coordinates.lng)
+    const p = map.project(L.latLng(lat, lng), zoom)
+    return { spot: s, lat, lng, p }
+  })
+
+  const used = new Set<string>()
+  const clusters: Cluster[] = []
+
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]
+    if (used.has(a.spot.id)) continue
+    used.add(a.spot.id)
+
+    const members: typeof pts = [a]
+    for (let j = i + 1; j < pts.length; j++) {
+      const b = pts[j]
+      if (used.has(b.spot.id)) continue
+      const dx = a.p.x - b.p.x
+      const dy = a.p.y - b.p.y
+      const d = Math.sqrt(dx * dx + dy * dy)
+      if (d <= thresholdPx) {
+        used.add(b.spot.id)
+        members.push(b)
+      }
+    }
+
+    const center = members.reduce((acc, m) => ({ lat: acc.lat + m.lat, lng: acc.lng + m.lng }), { lat: 0, lng: 0 })
+    const n = members.length || 1
+    clusters.push({
+      key: members.length === 1 ? members[0].spot.id : `cluster:${members.map((m) => m.spot.id).join(",")}`,
+      coords: { lat: center.lat / n, lng: center.lng / n },
+      spots: members.map((m) => m.spot),
+    })
+  }
+
+  return clusters
 }
 
 function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: NavigationState }) {
@@ -149,49 +251,7 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
     return visibleSpots.length - visibleSpotsWithCoords.length
   }, [visibleSpots, visibleSpotsWithCoords])
 
-  const citySpotCounts = useMemo(() => {
-    const counts: Record<
-      string,
-      {
-        count: number
-        coords: { lat: number; lng: number }
-        cityName: string
-        spots: Spot[]
-        categorySummary: string
-      }
-    > = {}
-
-    visibleSpotsWithCoords.forEach((spot) => {
-      const key = `${spot.city}, ${spot.country}`
-      if (!counts[key]) {
-        counts[key] = {
-          count: 0,
-          coords: spot.coordinates,
-          cityName: key,
-          spots: [],
-          categorySummary: "",
-        }
-      }
-      counts[key].count++
-      counts[key].spots.push(spot)
-    })
-
-    // Build a category summary for each city marker
-    for (const key of Object.keys(counts)) {
-      const byCategory = counts[key].spots.reduce((acc, s) => {
-        acc[s.category] = (acc[s.category] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-
-      const parts = Object.entries(byCategory).map(([cat, n]) => {
-        const label = cat.charAt(0).toUpperCase() + cat.slice(1)
-        return n === 1 ? label : `${label} (${n})`
-      })
-      counts[key].categorySummary = parts.join(", ")
-    }
-
-    return counts
-  }, [visibleSpotsWithCoords])
+  const mode: "city_compare" | "city_detail" = navigation?.city ? "city_detail" : "city_compare"
 
   if (!isMounted) {
     return (
@@ -213,7 +273,7 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
             {missingCoordsCount} {missingCoordsCount === 1 ? "spot is" : "spots are"} missing map coordinates and won’t appear on the map until a location is selected.
           </p>
         )}
-        {Object.keys(citySpotCounts).length === 0 && visibleSpots.length > 0 && (
+        {visibleSpotsWithCoords.length === 0 && visibleSpots.length > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">
             No mappable spots for this view yet. Add or fix a spot by selecting a location so it has real coordinates.
           </p>
@@ -241,57 +301,117 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <MapBounds spots={spots} navigation={navigation} />
-            {Object.entries(citySpotCounts).map(([key, data]) => (
-              <Marker
-                key={key}
-                position={[data.coords.lat, data.coords.lng]}
-                icon={createCustomIcon(data.count)}
-              >
-                <Popup>
-                  <div className="min-w-[200px]">
-                    <div className="space-y-2">
-                      {data.spots.map((spot) => (
-                        <button
-                          key={spot.id}
-                          type="button"
-                          className="block w-full text-left hover:bg-muted/50 rounded px-2 py-1 transition-colors"
-                          onClick={() => onSpotClick?.(spot)}
-                        >
-                          <div className="font-medium text-sm leading-tight">{spot.name}</div>
-                          <div className="text-xs text-muted-foreground leading-tight mt-0.5">
-                            {spot.category.charAt(0).toUpperCase() + spot.category.slice(1)}
-                          </div>
-                          <div className="text-xs text-muted-foreground leading-tight">
-                            {spot.city}, {spot.country}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            <MapMarkers mode={mode} spots={visibleSpotsWithCoords} onSpotClick={onSpotClick} />
           </MapContainer>
         </div>
       </div>
 
       {/* Legend */}
-      <div className="mt-6 space-y-3">
-        <div className="text-sm font-medium">Locations</div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(citySpotCounts).map(([key, data]) => (
-            <div key={key} className="flex items-center gap-3 rounded-md bg-muted px-3 py-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              <div className="flex-1 text-sm">
-                <div className="font-medium">{data.cityName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {data.count} {data.count === 1 ? "spot" : "spots"}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="mt-6 text-sm text-muted-foreground">
+        {mode === "city_compare"
+          ? "City totals view: one marker per city for easy comparison."
+          : "City detail view: each spot is placed at its true coordinates; markers only cluster when overlapping visually."}
       </div>
     </div>
+  )
+}
+
+function MapMarkers({
+  mode,
+  spots,
+  onSpotClick,
+}: {
+  mode: "city_compare" | "city_detail"
+  spots: Spot[]
+  onSpotClick?: (spot: Spot) => void
+}) {
+  const { useMap } = require("react-leaflet")
+  const map = useMap()
+  const [clusters, setClusters] = useState<Cluster[]>([])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const recompute = () => {
+      if (mode === "city_compare") {
+        setClusters(computeCityClusters(spots))
+        return
+      }
+
+      const z = map.getZoom?.() ?? 0
+      const threshold = z >= 14 ? 14 : z >= 11 ? 22 : 30
+      setClusters(computePixelClusters(spots, map, threshold))
+    }
+
+    recompute()
+    map.on("zoomend", recompute)
+    map.on("moveend", recompute)
+    return () => {
+      map.off("zoomend", recompute)
+      map.off("moveend", recompute)
+    }
+  }, [mode, spots, map])
+
+  return (
+    <>
+      {clusters.map((c) => {
+        const count = c.spots.length
+        const icon = mode === "city_compare" ? createCustomIcon(count) : count > 1 ? createCustomIcon(count) : createSpotIcon()
+        const label = c.label || cityLabelOf(c.spots[0])
+        return (
+          <Marker key={c.key} position={[c.coords.lat, c.coords.lng]} icon={icon}>
+            <Popup>
+              {mode === "city_compare" ? (
+                <div className="min-w-[220px]">
+                  <div className="font-medium text-sm leading-tight">{label}</div>
+                  <div className="text-xs text-muted-foreground leading-tight mt-0.5">
+                    {count} {count === 1 ? "spot" : "spots"}
+                  </div>
+                </div>
+              ) : count > 1 ? (
+                <div className="min-w-[220px]">
+                  <h4 className="font-medium">{count} spots here</h4>
+                  <div className="mt-2 space-y-1">
+                    {c.spots.map((spot) => (
+                      <button
+                        key={spot.id}
+                        type="button"
+                        className="block w-full text-left hover:bg-muted/50 rounded px-2 py-1 transition-colors"
+                        onClick={() => onSpotClick?.(spot)}
+                      >
+                        <div className="font-medium text-sm leading-tight">{spot.name}</div>
+                        <div className="text-xs text-muted-foreground leading-tight mt-0.5">
+                          {spot.category.charAt(0).toUpperCase() + spot.category.slice(1)}
+                        </div>
+                        <div className="text-xs text-muted-foreground leading-tight">
+                          {spot.city}, {spot.country}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="min-w-[220px]">
+                  <div className="font-medium text-sm leading-tight">{c.spots[0]?.name}</div>
+                  <div className="text-xs text-muted-foreground leading-tight mt-0.5">
+                    {c.spots[0]?.category ? c.spots[0].category.charAt(0).toUpperCase() + c.spots[0].category.slice(1) : ""}
+                  </div>
+                  <div className="text-xs text-muted-foreground leading-tight">
+                    {c.spots[0]?.city}, {c.spots[0]?.country}
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-3 text-sm text-primary hover:underline"
+                    onClick={() => c.spots[0] && onSpotClick?.(c.spots[0])}
+                  >
+                    View details
+                  </button>
+                </div>
+              )}
+            </Popup>
+          </Marker>
+        )
+      })}
+    </>
   )
 }
