@@ -76,20 +76,9 @@ export function QuickAddForm({ onSubmit }: QuickAddFormProps) {
         result.meta.warnings.forEach((warning) => toast.warning(warning))
       }
 
-      // If requires confirmation, show dialog
-      if (result.meta.requiresConfirmation) {
-        setImportResult(result)
-      } else {
-        // Auto-submit high-confidence results
-        onSubmit(result.draft)
-        setUrl("")
-        try {
-          window.sessionStorage.removeItem(QUICK_DRAFT_KEY)
-        } catch {
-          // ignore
-        }
-        toast.success("Spot imported successfully")
-      }
+      // Always show the confirmation form before creating the spot.
+      // Quick Add should never auto-create spots, even on high confidence.
+      setImportResult(result)
     } catch (error: any) {
       toast.error(error.message || "Failed to import URL")
     } finally {
