@@ -101,7 +101,14 @@ export function formatTodayHours(openingHours: OpeningHours | undefined, now = n
     weekdayText.find((l) => typeof l === "string" && l.toLowerCase().startsWith(dayShort.toLowerCase())) ||
     null
 
-  return line ? String(line) : null
+  if (!line) return null
+
+  // Normalize to "just the hours" (no weekday prefix) so callers can render "Sun: <hours>" consistently.
+  let s = String(line).trim()
+  // Remove "Sunday:", "Sunday ", "Sun:", "Sun " (case-insensitive)
+  const prefixRe = new RegExp(`^(${dayLong}|${dayShort})\\s*[:\\-]?\\s*`, "i")
+  s = s.replace(prefixRe, "").trim()
+  return s || null
 }
 
 
