@@ -284,13 +284,19 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
                 onChange={(e) => setDraft({ ...draft, link: e.target.value })}
                 placeholder="https://..."
               />
-              {draft.link && (
-                <Button type="button" variant="outline" size="icon" asChild>
-                  <a href={draft.link} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </Button>
-              )}
+              <Button type="button" variant="outline" size="icon" asChild disabled={!draft.link}>
+                <a
+                  href={draft.link || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (!draft.link) e.preventDefault()
+                  }}
+                  aria-disabled={!draft.link}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
             </div>
 
             {true && (

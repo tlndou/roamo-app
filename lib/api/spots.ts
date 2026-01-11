@@ -7,6 +7,11 @@ type DbSpot = Database["public"]["Tables"]["spots"]["Row"]
 type InsertSpot = Database["public"]["Tables"]["spots"]["Insert"]
 type UpdateSpot = Database["public"]["Tables"]["spots"]["Update"]
 
+function normalizeLink(value: string | undefined | null): string | null {
+  const v = typeof value === "string" ? value.trim() : ""
+  return v.length ? v : null
+}
+
 async function enrichOpeningHoursIfPossible(spot: Spot): Promise<Spot> {
   if (!spot.googlePlaceId) return spot
   // If we already have Google-sourced hours, don't re-fetch.
@@ -47,7 +52,7 @@ export function transformDbSpot(dbSpot: DbSpot): Spot {
     customImage: dbSpot.custom_image ?? undefined,
     iconColor: dbSpot.icon_color as Spot["iconColor"],
     link: dbSpot.link ?? undefined,
-    link2: (dbSpot as any).link2 ?? undefined,
+    link2: dbSpot.link2 ?? undefined,
     googlePlaceId: dbSpot.google_place_id ?? undefined,
     openingHours: (dbSpot.opening_hours as any) ?? undefined,
     recommendedVisitTime: (dbSpot.recommended_visit_time as any) ?? undefined,
@@ -81,8 +86,8 @@ export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
     use_custom_image: spot.useCustomImage,
     custom_image: spot.customImage ?? null,
     icon_color: spot.iconColor,
-    link: spot.link ?? null,
-    link2: spot.link2 ?? null,
+    link: normalizeLink(spot.link),
+    link2: normalizeLink(spot.link2),
     google_place_id: spot.googlePlaceId ?? null,
     opening_hours: (spot.openingHours as any) ?? null,
     opening_hours_source: spot.openingHours?.source ?? null,
@@ -113,8 +118,8 @@ export function transformToDbSpotUpdate(spot: Spot): UpdateSpot {
     use_custom_image: spot.useCustomImage,
     custom_image: spot.customImage ?? null,
     icon_color: spot.iconColor,
-    link: spot.link ?? null,
-    link2: spot.link2 ?? null,
+    link: normalizeLink(spot.link),
+    link2: normalizeLink(spot.link2),
     google_place_id: spot.googlePlaceId ?? null,
     opening_hours: (spot.openingHours as any) ?? null,
     opening_hours_source: spot.openingHours?.source ?? null,
