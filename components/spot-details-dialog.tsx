@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Upload, Image as ImageIcon, ExternalLink } from "lucide-react"
+import { Upload, Image as ImageIcon, ExternalLink, Plus } from "lucide-react"
 import type { Spot, SpotCategory, IconColor, VisitTimeLabel } from "@/types/spot"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -82,7 +82,12 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
     if (!hasValidLocation) return
     setSaving(true)
     try {
-      await onSave(draft)
+      const cleaned = {
+        ...draft,
+        // If the optional 2nd link is blank, treat it as removed.
+        link2: draft.link2 && draft.link2.trim().length > 0 ? draft.link2.trim() : undefined,
+      }
+      await onSave(cleaned)
     } finally {
       setSaving(false)
     }
@@ -92,6 +97,8 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
     (draft.openingHours?.weekdayText && draft.openingHours.weekdayText.length > 0) ||
       (draft.openingHours?.periods && draft.openingHours.periods.length > 0)
   )
+
+  const showSecondLink = draft.link2 !== undefined
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -285,6 +292,42 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
                 </Button>
               )}
             </div>
+
+            {true && (
+              <div className="mt-2">
+                {showSecondLink ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={draft.link2 ?? ""}
+                      onChange={(e) => setDraft({ ...draft, link2: e.target.value })}
+                      placeholder="https://..."
+                    />
+                    <Button type="button" variant="outline" size="icon" asChild disabled={!draft.link2}>
+                      <a
+                        href={draft.link2 || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          if (!draft.link2) e.preventDefault()
+                        }}
+                        aria-disabled={!draft.link2}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-xs text-foreground hover:underline"
+                    onClick={() => setDraft({ ...draft, link2: "" })}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add another link</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
