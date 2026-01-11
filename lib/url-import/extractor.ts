@@ -8,6 +8,7 @@ import { GenericWebsiteExtractor } from "./extractors/generic-website"
 import { URLImportResult } from "@/types/url-import"
 import { ProviderExtractor } from "@/types/providers"
 import { enrichSpotDraft } from "./ai-enrichment"
+import { applyInferredVisitTime } from "@/lib/visit-time/infer"
 
 export class URLExtractor {
   private extractors: Map<string, ProviderExtractor>
@@ -54,6 +55,9 @@ export class URLExtractor {
       // Step 7: AI enrichment (clean titles, infer category)
       result.draft = await enrichSpotDraft(result.draft, result.meta)
 
+      // Step 8: Conservative suggested visit time (only when hours are missing)
+      result.draft = applyInferredVisitTime(result.draft as any) as any
+
       return result
     } catch (error) {
       // If provider-specific extraction fails:
@@ -66,6 +70,7 @@ export class URLExtractor {
         result.meta.rawUrl = urlString
         result.meta.resolvedUrl = resolvedUrl.toString()
         result.draft = await enrichSpotDraft(result.draft, result.meta)
+        result.draft = applyInferredVisitTime(result.draft as any) as any
         return result
       }
 
@@ -80,6 +85,7 @@ export class URLExtractor {
 
         // AI enrichment for fallback results too
         result.draft = await enrichSpotDraft(result.draft, result.meta)
+        result.draft = applyInferredVisitTime(result.draft as any) as any
 
         return result
       }

@@ -1,4 +1,4 @@
-import { SpotCategory, IconColor } from "./spot"
+import type { OpeningHours, SpotCategory, IconColor, VisitTimeConfidence, VisitTimeLabel, VisitTimeSource } from "./spot"
 
 export type ConfidenceLevel = "high" | "medium" | "low"
 
@@ -74,6 +74,9 @@ export interface SpotDraft {
   name: string
   address?: string
   city: string
+  canonicalCityId?: string
+  neighborhood?: string
+  adminArea?: string
   country: string
   continent: string
   coordinates: {
@@ -88,6 +91,10 @@ export interface SpotDraft {
   iconColor: IconColor
   visited: boolean
   rating?: number
+  openingHours?: OpeningHours
+  recommendedVisitTime?: VisitTimeLabel
+  visitTimeSource?: VisitTimeSource
+  visitTimeConfidence?: VisitTimeConfidence
 }
 
 export interface URLImportResult {

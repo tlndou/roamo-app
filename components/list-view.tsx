@@ -7,6 +7,7 @@ import type { Spot } from "@/types/spot"
 import { getCountryContinent } from "@/lib/country-utils"
 import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
 import { cn } from "@/lib/utils"
+import { formatTodayHours } from "@/lib/opening-hours/today"
 
 interface NavigationState {
   level: "continent" | "country" | "city" | "spots"
@@ -150,6 +151,16 @@ export function ListView({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {spot.city}, {spot.country}
                 </p>
+                {(() => {
+                  const today = formatTodayHours(spot.openingHours)
+                  if (!today) return null
+                  const dayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date().getDay()]
+                  return (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dayShort}: {today}
+                    </p>
+                  )
+                })()}
               </div>
 
               <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react"
 import { URLImportResult } from "@/types/url-import"
-import { Spot } from "@/types/spot"
+import { Spot, VisitTimeLabel } from "@/types/spot"
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,18 @@ import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/categ
 import { cn } from "@/lib/utils"
 import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { getCountryContinent } from "@/lib/country-utils"
+import { formatOpeningHours } from "@/lib/opening-hours/format"
+import { isVisitTimeAllowedToday } from "@/lib/visit-time/availability"
+
+const visitTimeOptions: { value: VisitTimeLabel; label: string }[] = [
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "daytime", label: "Daytime" },
+  { value: "lunch", label: "Lunch" },
+  { value: "dinner", label: "Dinner" },
+  { value: "evening", label: "Evening" },
+  { value: "late_night", label: "Late night" },
+]
 
 interface ConfirmationDialogProps {
   result: URLImportResult
@@ -46,6 +58,11 @@ export function ConfirmationDialog({
     editedDraft.city !== "Unknown" &&
     editedDraft.country !== "Unknown" &&
     !(editedDraft.coordinates.lat === 0 && editedDraft.coordinates.lng === 0)
+
+  const hasOpeningHours = Boolean(
+    (editedDraft.openingHours?.weekdayText && editedDraft.openingHours.weekdayText.length > 0) ||
+      (editedDraft.openingHours?.periods && editedDraft.openingHours.periods.length > 0)
+  )
 
   const getConfidenceBadge = (confidence: string) => {
     const colors = {
@@ -178,6 +195,66 @@ export function ConfirmationDialog({
               placeholder="Add comments..."
               rows={4}
             />
+          </div>
+
+          {/* Opening hours (factual) */}
+          {hasOpeningHours && (
+            <div className="space-y-2">
+              <Label>Opening hours</Label>
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <ul className="space-y-1">
+                  {formatOpeningHours(editedDraft.openingHours).map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Suggested visiting time (always visible; constrained by hours when available) */}
+          <div className="space-y-2">
+            <Label>Suggested time</Label>
+            <Select
+              value={(editedDraft.recommendedVisitTime as any) || "none"}
+              onValueChange={(v) => {
+                if (v === "none") {
+                  setEditedDraft({
+                    ...editedDraft,
+                    recommendedVisitTime: undefined,
+                    visitTimeSource: undefined,
+                    visitTimeConfidence: undefined,
+                  })
+                  return
+                }
+                setEditedDraft({
+                  ...editedDraft,
+                  recommendedVisitTime: v as VisitTimeLabel,
+                  visitTimeSource: "user",
+                  visitTimeConfidence: "high",
+                })
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No suggestion" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No suggestion</SelectItem>
+                {visitTimeOptions.map((o) => {
+                  const allowed = isVisitTimeAllowedToday(editedDraft.openingHours, o.value)
+                  return (
+                    <SelectItem key={o.value} value={o.value} disabled={!allowed}>
+                      {o.label}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Usually best — based on similar places. If opening hours are known, unavailable times are disabled.
+            </p>
+            {editedDraft.visitTimeSource === "inferred" && (
+              <p className="text-xs text-muted-foreground">Suggestion was auto-filled (low confidence).</p>
+            )}
           </div>
 
           <div className="space-y-4">

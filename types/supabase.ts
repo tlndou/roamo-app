@@ -77,6 +77,11 @@ export interface Database {
           custom_image: string | null
           icon_color: string
           link: string | null
+          opening_hours: Json | null
+          opening_hours_source: string | null
+          recommended_visit_time: string | null
+          visit_time_source: string | null
+          visit_time_confidence: string | null
           lat: number
           lng: number
           visited: boolean
@@ -101,6 +106,11 @@ export interface Database {
           custom_image?: string | null
           icon_color?: string
           link?: string | null
+          opening_hours?: Json | null
+          opening_hours_source?: string | null
+          recommended_visit_time?: string | null
+          visit_time_source?: string | null
+          visit_time_confidence?: string | null
           lat: number
           lng: number
           visited?: boolean
@@ -122,6 +132,11 @@ export interface Database {
           custom_image?: string | null
           icon_color?: string
           link?: string | null
+          opening_hours?: Json | null
+          opening_hours_source?: string | null
+          recommended_visit_time?: string | null
+          visit_time_source?: string | null
+          visit_time_confidence?: string | null
           lat?: number
           lng?: number
           visited?: boolean

@@ -179,6 +179,9 @@ export class GoogleMapsExtractor implements ProviderExtractor {
       "location",
       "types",
       "addressComponents",
+      // Opening hours (if enabled for the Places (New) API project)
+      // We will retry without this field if the API rejects the mask.
+      "regularOpeningHours",
     ].join(",")
 
     const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=${encodeURIComponent(fieldMask)}`
@@ -199,6 +202,37 @@ export class GoogleMapsExtractor implements ProviderExtractor {
       const message =
         (data && typeof data === "object" && "error" in data && (data as any).error?.message) ||
         `HTTP ${response.status}`
+      // If opening hours field isn't supported/allowed, retry with a minimal field mask
+      const msgLower = String(message || "").toLowerCase()
+      const looksLikeFieldMaskIssue =
+        msgLower.includes("fieldmask") ||
+        msgLower.includes("field mask") ||
+        msgLower.includes("unknown field") ||
+        msgLower.includes("invalid") ||
+        msgLower.includes("regularopeninghours")
+      if (looksLikeFieldMaskIssue) {
+        const fallbackFieldMask = ["id", "displayName", "formattedAddress", "location", "types", "addressComponents"].join(",")
+        const fallbackUrl = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=${encodeURIComponent(
+          fallbackFieldMask
+        )}`
+        const retry = await fetch(fallbackUrl, {
+          signal: AbortSignal.timeout(10000),
+          headers: {
+            "X-Goog-Api-Key": this.apiKey,
+            "X-Goog-FieldMask": fallbackFieldMask,
+          },
+        })
+        const retryData = await retry.json().catch(() => ({}))
+        if (!retry.ok) {
+          const retryMessage =
+            (retryData && typeof retryData === "object" && "error" in retryData && (retryData as any).error?.message) ||
+            `HTTP ${retry.status}`
+          console.error(`[Google Maps] Places API (New) retry error:`, retryData)
+          throw new Error(`Google Places API error: ${retry.status} - ${retryMessage}`)
+        }
+        return retryData
+      }
+
       console.error(`[Google Maps] Places API (New) error:`, data)
       throw new Error(`Google Places API error: ${response.status} - ${message}`)
     }
@@ -229,6 +263,7 @@ export class GoogleMapsExtractor implements ProviderExtractor {
           lng: place.location.longitude,
         },
         category: this.inferCategory(place.types || []),
+        openingHours: this.extractOpeningHours(place) ?? undefined,
         link: url.toString(),
         useCustomImage: false,
         iconColor: "grey",
@@ -258,6 +293,35 @@ export class GoogleMapsExtractor implements ProviderExtractor {
         resolvedUrl: url.toString(),
       },
     }
+  }
+
+  private extractOpeningHours(place: any): any | null {
+    const roh = place?.regularOpeningHours
+    if (!roh || typeof roh !== "object") return null
+
+    const weekdayText = Array.isArray(roh.weekdayDescriptions)
+      ? roh.weekdayDescriptions.filter((s: any) => typeof s === "string" && s.trim())
+      : undefined
+
+    const periodsRaw = Array.isArray(roh.periods) ? roh.periods : []
+    const periods = periodsRaw
+      .map((p: any) => {
+        const open = p?.open
+        const close = p?.close
+        const openDay = typeof open?.day === "number" ? open.day : typeof open?.day === "string" ? Number(open.day) : null
+        const openTime = typeof open?.time === "string" ? open.time : null
+        if (openDay == null || !openTime) return null
+        const out: any = { open: { day: openDay, time: openTime } }
+        const closeDay = typeof close?.day === "number" ? close.day : typeof close?.day === "string" ? Number(close.day) : null
+        const closeTime = typeof close?.time === "string" ? close.time : null
+        if (closeDay != null && closeTime) out.close = { day: closeDay, time: closeTime }
+        return out
+      })
+      .filter(Boolean)
+
+    if ((!weekdayText || weekdayText.length === 0) && periods.length === 0) return null
+
+    return { source: "google_places", ...(weekdayText ? { weekdayText } : {}), ...(periods.length ? { periods } : {}) }
   }
 
   private extractLatLng(url: URL): { lat: number; lng: number } | undefined {

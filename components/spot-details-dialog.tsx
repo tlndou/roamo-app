@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Upload, Image as ImageIcon, ExternalLink } from "lucide-react"
-import type { Spot, SpotCategory, IconColor } from "@/types/spot"
+import type { Spot, SpotCategory, IconColor, VisitTimeLabel } from "@/types/spot"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,8 @@ import { ImageCropDialog } from "@/components/image-crop-dialog"
 import { categoryIcons, iconColorBgClasses, iconColorClasses } from "@/lib/category-icons"
 import { getCountryContinent } from "@/lib/country-utils"
 import { cn } from "@/lib/utils"
+import { formatOpeningHours } from "@/lib/opening-hours/format"
+import { isVisitTimeAllowedToday } from "@/lib/visit-time/availability"
 
 const categories: { value: SpotCategory; label: string }[] = [
   { value: "restaurant", label: "Restaurant" },
@@ -30,6 +32,16 @@ const categories: { value: SpotCategory; label: string }[] = [
   { value: "hotel", label: "Hotel" },
   { value: "shop", label: "Shop" },
   { value: "other", label: "Other" },
+]
+
+const visitTimeOptions: { value: VisitTimeLabel; label: string }[] = [
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "daytime", label: "Daytime" },
+  { value: "lunch", label: "Lunch" },
+  { value: "dinner", label: "Dinner" },
+  { value: "evening", label: "Evening" },
+  { value: "late_night", label: "Late night" },
 ]
 
 interface SpotDetailsDialogProps {
@@ -75,6 +87,11 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
       setSaving(false)
     }
   }
+
+  const hasOpeningHours = Boolean(
+    (draft.openingHours?.weekdayText && draft.openingHours.weekdayText.length > 0) ||
+      (draft.openingHours?.periods && draft.openingHours.periods.length > 0)
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -190,6 +207,66 @@ export function SpotDetailsDialog({ open, onOpenChange, spot, onSave }: SpotDeta
               rows={4}
               placeholder="Add comments..."
             />
+          </div>
+
+          {/* Opening Hours (factual) */}
+          {hasOpeningHours && (
+            <div className="space-y-2">
+              <Label>Opening hours</Label>
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <ul className="space-y-1">
+                  {formatOpeningHours(draft.openingHours).map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Suggested visiting time (always visible; constrained by hours when available) */}
+          <div className="space-y-2">
+            <Label>Suggested time</Label>
+            <Select
+              value={(draft.recommendedVisitTime as any) || "none"}
+              onValueChange={(v) => {
+                if (v === "none") {
+                  setDraft({
+                    ...draft,
+                    recommendedVisitTime: undefined,
+                    visitTimeSource: undefined,
+                    visitTimeConfidence: undefined,
+                  })
+                  return
+                }
+                setDraft({
+                  ...draft,
+                  recommendedVisitTime: v as VisitTimeLabel,
+                  visitTimeSource: "user",
+                  visitTimeConfidence: "high",
+                })
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No suggestion" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No suggestion</SelectItem>
+                {visitTimeOptions.map((o) => {
+                  const allowed = isVisitTimeAllowedToday(draft.openingHours, o.value)
+                  return (
+                    <SelectItem key={o.value} value={o.value} disabled={!allowed}>
+                      {o.label}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Usually best — based on similar places. If opening hours are known, unavailable times are disabled.
+            </p>
+            {draft.visitTimeSource === "inferred" && (
+              <p className="text-xs text-muted-foreground">Suggestion was auto-filled (low confidence).</p>
+            )}
           </div>
 
           <div className="space-y-2">

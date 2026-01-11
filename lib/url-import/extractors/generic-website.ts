@@ -38,6 +38,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         continent,
         coordinates: metadata.coordinates || { lat: 0, lng: 0 },
         category,
+        openingHours: metadata.openingHours ?? undefined,
         link: url.toString(),
         comments: metadata.description,
         useCustomImage: false,
@@ -487,6 +488,8 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
 
     const title = this.cleanTitle(best.name, url) ?? this.cleanTitle(best.headline, url) ?? undefined
 
+    const openingHours = this.extractJsonLdOpeningHours(best)
+
     const rawTypes = best?.["@type"]
     const jsonLdTypes = Array.isArray(rawTypes)
       ? rawTypes.map((t: any) => String(t))
@@ -504,8 +507,79 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
           ? coords
           : undefined,
       description: best.description ? this.stripTags(String(best.description)) : undefined,
+      openingHours,
       jsonLdTypes,
     }
+  }
+
+  private extractJsonLdOpeningHours(best: any): any | undefined {
+    // Schema.org: openingHours (string or string[]) and openingHoursSpecification (array of objects)
+    const out: any = { source: "json_ld" }
+
+    const oh = best?.openingHours
+    if (typeof oh === "string" && oh.trim()) {
+      out.weekdayText = [this.decodeHtmlEntities(oh.trim())]
+      return out
+    }
+    if (Array.isArray(oh)) {
+      const lines = oh.filter((s: any) => typeof s === "string" && s.trim()).map((s: string) => this.decodeHtmlEntities(s.trim()))
+      if (lines.length) {
+        out.weekdayText = lines
+        return out
+      }
+    }
+
+    const spec = best?.openingHoursSpecification
+    const specs = Array.isArray(spec) ? spec : spec ? [spec] : []
+    const periods: any[] = []
+    for (const s of specs) {
+      if (!s || typeof s !== "object") continue
+      const opens = typeof (s as any).opens === "string" ? (s as any).opens : null
+      const closes = typeof (s as any).closes === "string" ? (s as any).closes : null
+      const dayOfWeekRaw = (s as any).dayOfWeek
+      const days: string[] = Array.isArray(dayOfWeekRaw) ? dayOfWeekRaw : dayOfWeekRaw ? [dayOfWeekRaw] : []
+
+      // Map Schema.org dayOfWeek tokens to 0..6
+      const mapDay = (d: string): number | null => {
+        const key = d.toLowerCase()
+        if (key.includes("monday")) return 1
+        if (key.includes("tuesday")) return 2
+        if (key.includes("wednesday")) return 3
+        if (key.includes("thursday")) return 4
+        if (key.includes("friday")) return 5
+        if (key.includes("saturday")) return 6
+        if (key.includes("sunday")) return 0
+        return null
+      }
+
+      const toHHMM = (t: string | null): string | null => {
+        if (!t) return null
+        const m = t.trim().match(/^(\d{1,2}):(\d{2})/)
+        if (!m) return null
+        const hh = String(m[1]).padStart(2, "0")
+        const mm = String(m[2]).padStart(2, "0")
+        return `${hh}:${mm}`
+      }
+
+      const openTime = toHHMM(opens)
+      const closeTime = toHHMM(closes)
+      if (!openTime) continue
+
+      for (const d of days) {
+        const day = mapDay(String(d))
+        if (day == null) continue
+        const p: any = { open: { day, time: openTime } }
+        if (closeTime) p.close = { day, time: closeTime }
+        periods.push(p)
+      }
+    }
+
+    if (periods.length) {
+      out.periods = periods
+      return out
+    }
+
+    return undefined
   }
 
   private extractOpenGraph(html: string, url: URL): any {
