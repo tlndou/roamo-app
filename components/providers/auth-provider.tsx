@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { fetchProfile } from "@/lib/api/profiles"
+import { ensureProfile } from "@/lib/api/profiles"
 import type { User } from "@supabase/supabase-js"
 import type { Profile } from "@/types/profile"
 
@@ -31,12 +31,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // which can cause brief loading flashes (and unmount UI like dialogs).
   const supabase = useMemo(() => createClient(), [])
 
-  const loadProfile = async (userId: string) => {
+  const loadProfile = async (u: User) => {
     try {
-      const profileData = await fetchProfile(userId)
+      const profileData = await ensureProfile({ id: u.id, email: u.email })
       setProfile(profileData)
     } catch (error) {
-      console.error("Error loading profile:", error)
+      const e: any = error
+      console.error("Error loading profile:", {
+        message: e?.message,
+        details: e?.details,
+        hint: e?.hint,
+        code: e?.code,
+        status: e?.status,
+        raw: e,
+      })
+      setProfile(null)
     }
   }
 
@@ -44,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadProfile(session.user.id)
+        loadProfile(session.user)
       }
       setLoading(false)
     })
@@ -54,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadProfile(session.user.id)
+        loadProfile(session.user)
       } else {
         setProfile(null)
       }
@@ -72,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      await loadProfile(user.id)
+      await loadProfile(user)
     }
   }
 

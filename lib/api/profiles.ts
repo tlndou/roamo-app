@@ -6,6 +6,7 @@ import { canonicalizeCity } from "@/lib/geo/canonical-city"
 import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
 
 type DbProfile = Database["public"]["Tables"]["profiles"]["Row"]
+type InsertProfile = Database["public"]["Tables"]["profiles"]["Insert"]
 
 // Transform DB profile to app Profile type
 export function transformDbProfile(dbProfile: DbProfile): Profile {
@@ -45,7 +46,29 @@ export function transformDbProfile(dbProfile: DbProfile): Profile {
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const supabase = createClient()
 
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
+
+  if (error) throw error
+  return data ? transformDbProfile(data) : null
+}
+
+/**
+ * Ensures the user has a `profiles` row (some Supabase setups don't auto-create it).
+ * If missing, attempts to insert a minimal row.
+ */
+export async function ensureProfile(user: { id: string; email?: string | null }): Promise<Profile | null> {
+  const supabase = createClient()
+
+  const existing = await fetchProfile(user.id)
+  if (existing) return existing
+
+  const insert: InsertProfile = {
+    id: user.id,
+    email: user.email ?? null,
+  }
+
+  // @ts-expect-error - Supabase type inference issue with optional fields
+  const { data, error } = await supabase.from("profiles").insert(insert).select("*").single()
 
   if (error) throw error
   return data ? transformDbProfile(data) : null
@@ -94,8 +117,12 @@ export async function updateProfile(userId: string, updates: ProfileUpdate): Pro
     dbUpdates.zodiac_sign = updates.zodiacSign
   }
 
+  // Upsert so profile updates work even if the profile row wasn't created yet.
+  // (RLS must allow insert/update for the current user.)
+  const upsertPayload: any = { id: userId, ...dbUpdates }
+
   // @ts-expect-error - Supabase type inference issue with optional fields
-  const { data, error } = await supabase.from("profiles").update(dbUpdates).eq("id", userId).select().single()
+  const { data, error } = await supabase.from("profiles").upsert(upsertPayload).select().single()
 
   if (error) throw error
   return transformDbProfile(data)
