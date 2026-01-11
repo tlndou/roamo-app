@@ -77,6 +77,7 @@ export interface Database {
           custom_image: string | null
           icon_color: string
           link: string | null
+          google_place_id: string | null
           opening_hours: Json | null
           opening_hours_source: string | null
           recommended_visit_time: string | null
@@ -106,6 +107,7 @@ export interface Database {
           custom_image?: string | null
           icon_color?: string
           link?: string | null
+          google_place_id?: string | null
           opening_hours?: Json | null
           opening_hours_source?: string | null
           recommended_visit_time?: string | null
@@ -132,6 +134,7 @@ export interface Database {
           custom_image?: string | null
           icon_color?: string
           link?: string | null
+          google_place_id?: string | null
           opening_hours?: Json | null
           opening_hours_source?: string | null
           recommended_visit_time?: string | null

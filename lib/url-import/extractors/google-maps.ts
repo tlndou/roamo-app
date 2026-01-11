@@ -265,6 +265,7 @@ export class GoogleMapsExtractor implements ProviderExtractor {
         category: this.inferCategory(place.types || []),
         openingHours: this.extractOpeningHours(place) ?? undefined,
         link: url.toString(),
+        googlePlaceId: place.id || undefined,
         useCustomImage: false,
         iconColor: "grey",
         visited: false,

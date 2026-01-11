@@ -7,6 +7,27 @@ type DbSpot = Database["public"]["Tables"]["spots"]["Row"]
 type InsertSpot = Database["public"]["Tables"]["spots"]["Insert"]
 type UpdateSpot = Database["public"]["Tables"]["spots"]["Update"]
 
+async function enrichOpeningHoursIfPossible(spot: Spot): Promise<Spot> {
+  if (!spot.googlePlaceId) return spot
+  // If we already have Google-sourced hours, don't re-fetch.
+  if (spot.openingHours?.source === "google_places") return spot
+
+  try {
+    const res = await fetch("/api/spots/enrich-opening-hours", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ spotId: spot.id }),
+    })
+
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data) return spot
+    if (data?.spot) return transformDbSpot(data.spot as DbSpot)
+    return spot
+  } catch {
+    return spot
+  }
+}
+
 // Transform DB spot to app Spot type
 export function transformDbSpot(dbSpot: DbSpot): Spot {
   const canon = canonicalizeCity({ city: dbSpot.canonical_city ?? dbSpot.city, country: dbSpot.country })
@@ -26,6 +47,7 @@ export function transformDbSpot(dbSpot: DbSpot): Spot {
     customImage: dbSpot.custom_image ?? undefined,
     iconColor: dbSpot.icon_color as Spot["iconColor"],
     link: dbSpot.link ?? undefined,
+    googlePlaceId: dbSpot.google_place_id ?? undefined,
     openingHours: (dbSpot.opening_hours as any) ?? undefined,
     recommendedVisitTime: (dbSpot.recommended_visit_time as any) ?? undefined,
     visitTimeSource: (dbSpot.visit_time_source as any) ?? undefined,
@@ -59,6 +81,7 @@ export function transformToDbSpot(spot: Spot, userId: string): InsertSpot {
     custom_image: spot.customImage ?? null,
     icon_color: spot.iconColor,
     link: spot.link ?? null,
+    google_place_id: spot.googlePlaceId ?? null,
     opening_hours: (spot.openingHours as any) ?? null,
     opening_hours_source: spot.openingHours?.source ?? null,
     recommended_visit_time: spot.recommendedVisitTime ?? null,
@@ -89,6 +112,7 @@ export function transformToDbSpotUpdate(spot: Spot): UpdateSpot {
     custom_image: spot.customImage ?? null,
     icon_color: spot.iconColor,
     link: spot.link ?? null,
+    google_place_id: spot.googlePlaceId ?? null,
     opening_hours: (spot.openingHours as any) ?? null,
     opening_hours_source: spot.openingHours?.source ?? null,
     recommended_visit_time: spot.recommendedVisitTime ?? null,
@@ -129,7 +153,8 @@ export async function createSpot(spot: Omit<Spot, "id">): Promise<Spot> {
 
   if (error) throw error
 
-  return transformDbSpot(data)
+  const created = transformDbSpot(data)
+  return await enrichOpeningHoursIfPossible(created)
 }
 
 export async function deleteSpot(id: string): Promise<void> {
@@ -164,5 +189,6 @@ export async function updateSpot(spot: Spot): Promise<Spot> {
 
   if (error) throw error
 
-  return transformDbSpot(data)
+  const updated = transformDbSpot(data)
+  return await enrichOpeningHoursIfPossible(updated)
 }

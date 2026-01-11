@@ -85,6 +85,7 @@ export interface SpotDraft {
   }
   category: SpotCategory
   link: string
+  googlePlaceId?: string
   comments?: string
   useCustomImage: boolean
   customImage?: string

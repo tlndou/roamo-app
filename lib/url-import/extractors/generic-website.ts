@@ -38,8 +38,8 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         continent,
         coordinates: metadata.coordinates || { lat: 0, lng: 0 },
         category,
-        openingHours: metadata.openingHours ?? undefined,
         link: url.toString(),
+        googlePlaceId: metadata.googlePlaceId,
         comments: metadata.description,
         useCustomImage: false,
         iconColor: "grey",
@@ -150,6 +150,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
     if (!this.googleApiKey) return null
     const url = "https://places.googleapis.com/v1/places:searchText"
     const fieldMask = [
+      "places.id",
       "places.displayName",
       "places.formattedAddress",
       "places.location",
@@ -217,6 +218,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
             address: place.formattedAddress,
             city,
             country,
+              googlePlaceId: place.id,
             coordinates:
               place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
                 ? { lat: place.location.latitude, lng: place.location.longitude }
@@ -262,6 +264,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
               address: place.formattedAddress,
               city: this.extractCityFromPlace(place) ?? jsonLd.city,
               country: this.extractCountryFromPlace(place) ?? jsonLd.country,
+              googlePlaceId: place.id,
               coordinates:
                 place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
                   ? { lat: place.location.latitude, lng: place.location.longitude }
@@ -271,6 +274,40 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
               flags: selection.flags,
               warnings: [
                 "Filled missing location details via Google Places search; please confirm details.",
+                ...selection.warnings,
+              ],
+              jsonLdTypes: jsonLd.jsonLdTypes,
+            }
+          }
+        }
+
+        // Even if JSON-LD has an address, try to resolve a Google Place ID using name+address
+        // so we can fetch authoritative opening hours from Google.
+        if (this.googleApiKey && jsonLd.address && !jsonLd.googlePlaceId) {
+          const places = await this.placesSearchText(`${jsonLd.title} ${jsonLd.address}`)
+          const selection = Array.isArray(places)
+            ? this.selectPlaceCandidateByNameAddress(places, {
+                title: jsonLd.title,
+                address: jsonLd.address,
+              })
+            : null
+          if (selection?.place) {
+            const place = selection.place
+            return {
+              title: jsonLd.title,
+              address: place.formattedAddress ?? jsonLd.address,
+              city: this.extractCityFromPlace(place) ?? jsonLd.city,
+              country: this.extractCountryFromPlace(place) ?? jsonLd.country,
+              googlePlaceId: place.id,
+              coordinates:
+                place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
+                  ? { lat: place.location.latitude, lng: place.location.longitude }
+                  : jsonLd.coordinates,
+              description: jsonLd.description,
+              method: "json_ld+places_search_name_address",
+              flags: selection.flags,
+              warnings: [
+                "Matched this website to a Google Place ID to fetch authoritative opening hours — please confirm details.",
                 ...selection.warnings,
               ],
               jsonLdTypes: jsonLd.jsonLdTypes,
@@ -340,6 +377,7 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
             address: place.formattedAddress,
             city,
             country,
+            googlePlaceId: place.id,
             coordinates:
               place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
                 ? { lat: place.location.latitude, lng: place.location.longitude }
@@ -370,6 +408,45 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
               multi_location_brand: true,
             },
             openGraph: og.openGraph,
+          }
+        }
+      }
+
+      // NEW: Even if we extracted an address/city/country heuristically, try to resolve a Google Place ID
+      // using name + address so we can fetch authoritative opening hours.
+      const canResolvePlaceId =
+        this.googleApiKey &&
+        title &&
+        heuristic.address &&
+        !(heuristic as any)?._ambiguous &&
+        !("googlePlaceId" in heuristic)
+
+      if (canResolvePlaceId && title) {
+        const places = await this.placesSearchText(`${title} ${heuristic.address}`)
+        const selection = Array.isArray(places)
+          ? this.selectPlaceCandidateByNameAddress(places, { title, address: heuristic.address })
+          : null
+        if (selection?.place) {
+          const place = selection.place
+          return {
+            ...og,
+            title,
+            address: place.formattedAddress ?? heuristic.address,
+            city: this.extractCityFromPlace(place) ?? heuristic.city,
+            country: this.extractCountryFromPlace(place) ?? heuristic.country,
+            googlePlaceId: place.id,
+            coordinates:
+              place.location && typeof place.location.latitude === "number" && typeof place.location.longitude === "number"
+                ? { lat: place.location.latitude, lng: place.location.longitude }
+                : heuristic.coordinates,
+            description: og.description,
+            method: "opengraph+places_search_name_address",
+            warnings: [
+              "Matched this website to a Google Place ID to fetch authoritative opening hours — please confirm details.",
+              ...heuristicWarnings,
+              ...(selection?.warnings ?? []),
+            ],
+            flags: selection.flags,
           }
         }
       }
@@ -488,7 +565,6 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
 
     const title = this.cleanTitle(best.name, url) ?? this.cleanTitle(best.headline, url) ?? undefined
 
-    const openingHours = this.extractJsonLdOpeningHours(best)
 
     const rawTypes = best?.["@type"]
     const jsonLdTypes = Array.isArray(rawTypes)
@@ -507,79 +583,70 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
           ? coords
           : undefined,
       description: best.description ? this.stripTags(String(best.description)) : undefined,
-      openingHours,
       jsonLdTypes,
     }
   }
 
-  private extractJsonLdOpeningHours(best: any): any | undefined {
-    // Schema.org: openingHours (string or string[]) and openingHoursSpecification (array of objects)
-    const out: any = { source: "json_ld" }
-
-    const oh = best?.openingHours
-    if (typeof oh === "string" && oh.trim()) {
-      out.weekdayText = [this.decodeHtmlEntities(oh.trim())]
-      return out
-    }
-    if (Array.isArray(oh)) {
-      const lines = oh.filter((s: any) => typeof s === "string" && s.trim()).map((s: string) => this.decodeHtmlEntities(s.trim()))
-      if (lines.length) {
-        out.weekdayText = lines
-        return out
-      }
+  private selectPlaceCandidateByNameAddress(
+    places: any[],
+    input: { title: string; address: string }
+  ): { place: any | null; flags: any; warnings: string[] } {
+    const flags: any = {}
+    const warnings: string[] = []
+    if (!Array.isArray(places) || places.length === 0) {
+      flags.insufficient_signals = true
+      return { place: null, flags, warnings }
     }
 
-    const spec = best?.openingHoursSpecification
-    const specs = Array.isArray(spec) ? spec : spec ? [spec] : []
-    const periods: any[] = []
-    for (const s of specs) {
-      if (!s || typeof s !== "object") continue
-      const opens = typeof (s as any).opens === "string" ? (s as any).opens : null
-      const closes = typeof (s as any).closes === "string" ? (s as any).closes : null
-      const dayOfWeekRaw = (s as any).dayOfWeek
-      const days: string[] = Array.isArray(dayOfWeekRaw) ? dayOfWeekRaw : dayOfWeekRaw ? [dayOfWeekRaw] : []
+    const norm = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
 
-      // Map Schema.org dayOfWeek tokens to 0..6
-      const mapDay = (d: string): number | null => {
-        const key = d.toLowerCase()
-        if (key.includes("monday")) return 1
-        if (key.includes("tuesday")) return 2
-        if (key.includes("wednesday")) return 3
-        if (key.includes("thursday")) return 4
-        if (key.includes("friday")) return 5
-        if (key.includes("saturday")) return 6
-        if (key.includes("sunday")) return 0
-        return null
+    const titleTokens = norm(input.title)
+      .split(" ")
+      .filter((t) => t.length >= 3)
+      .slice(0, 8)
+
+    const addrTokens = norm(input.address)
+      .split(" ")
+      .filter((t) => t.length >= 3 || /^\d+$/.test(t))
+      .slice(0, 16)
+
+    const scorePlace = (p: any) => {
+      const hay = norm(`${p?.displayName?.text ?? ""} ${p?.formattedAddress ?? ""}`)
+      let score = 0
+      for (const t of titleTokens) if (hay.includes(t)) score += 2
+      for (const t of addrTokens) {
+        if (hay.includes(t)) score += /^\d+$/.test(t) ? 5 : 3
       }
-
-      const toHHMM = (t: string | null): string | null => {
-        if (!t) return null
-        const m = t.trim().match(/^(\d{1,2}):(\d{2})/)
-        if (!m) return null
-        const hh = String(m[1]).padStart(2, "0")
-        const mm = String(m[2]).padStart(2, "0")
-        return `${hh}:${mm}`
-      }
-
-      const openTime = toHHMM(opens)
-      const closeTime = toHHMM(closes)
-      if (!openTime) continue
-
-      for (const d of days) {
-        const day = mapDay(String(d))
-        if (day == null) continue
-        const p: any = { open: { day, time: openTime } }
-        if (closeTime) p.close = { day, time: closeTime }
-        periods.push(p)
-      }
+      return score
     }
 
-    if (periods.length) {
-      out.periods = periods
-      return out
+    const ranked = places.map((p) => ({ p, s: scorePlace(p) })).sort((a, b) => b.s - a.s)
+    const top = ranked[0]
+    const second = ranked[1]
+
+    if (!top || top.s < 10) {
+      flags.insufficient_signals = true
+      warnings.push("Could not confidently match this address to a Google Place ID.")
+      return { place: null, flags, warnings }
     }
 
-    return undefined
+    if (second && top.s - second.s < 4) {
+      flags.multi_location_brand = true
+      warnings.push("Google Places match was ambiguous; please confirm the correct place.")
+      return { place: null, flags, warnings }
+    }
+
+    if (!top.p?.id) {
+      flags.insufficient_signals = true
+      return { place: null, flags, warnings }
+    }
+
+    return { place: top.p, flags, warnings }
   }
 
   private extractOpenGraph(html: string, url: URL): any {

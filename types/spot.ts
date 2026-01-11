@@ -69,6 +69,11 @@ export interface Spot {
   customImage?: string // URL or base64 for uploaded image
   iconColor: IconColor
   link?: string
+  /**
+   * Google Places (New) place id when known (authoritative key for opening hours).
+   * This is populated by URL importers and (in the future) a Google-powered place picker.
+   */
+  googlePlaceId?: string
   visited: boolean
   rating?: number // 0-5 with 0.5 increments, only when visited
   /** Verified opening hours when available (never inferred). */
