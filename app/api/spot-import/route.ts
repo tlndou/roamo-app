@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { URLExtractor } from "@/lib/url-import/extractor"
 import { URLValidationError } from "@/lib/url-import/url-validator"
+import { fetchPlaceOpeningHours } from "@/lib/google/places-details"
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,22 @@ export async function POST(request: NextRequest) {
     console.log("[spot-import] GOOGLE_MAPS_API_KEY configured:", Boolean(googleApiKey))
     const extractor = new URLExtractor(googleApiKey)
     const result = await extractor.extractFromURL(url)
+
+    // If we already have a Google Place ID, fetch authoritative opening hours NOW
+    // so Quick Add can show them before the user confirms/creates the spot.
+    try {
+      const placeId = (result as any)?.draft?.googlePlaceId as string | undefined
+      const hasGoogleHours = (result as any)?.draft?.openingHours?.source === "google_places"
+      if (googleApiKey && placeId && !hasGoogleHours) {
+        const opening = await fetchPlaceOpeningHours(placeId, googleApiKey)
+        if (opening) {
+          ;(result as any).draft.openingHours = { source: "google_places", ...opening }
+        }
+      }
+    } catch (e) {
+      // Non-fatal: we can still proceed without hours.
+      console.warn("[spot-import] opening hours enrichment skipped:", e)
+    }
 
     return NextResponse.json(result)
   } catch (error) {
