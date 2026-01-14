@@ -1,9 +1,16 @@
 "use client"
 
-import { useMemo, useEffect, useRef, useState } from "react"
+import { useMemo, useEffect, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
 import type { Spot } from "@/types/spot"
+import type { LocationPermission } from "@/types/profile"
 import { getCountryContinent } from "@/lib/country-utils"
+import { useUserLocation } from "@/hooks/use-user-location"
+import { useAuth } from "@/components/providers/auth-provider"
+import { updateLocationPermission } from "@/lib/api/profiles"
+import { LocationButton } from "@/components/user-location/location-button"
+import { LocationPermissionBanner } from "@/components/user-location/location-permission-banner"
+import { UserLocationMarker } from "@/components/user-location/user-location-marker"
 
 // Dynamically import Leaflet components with no SSR
 const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), { ssr: false })
@@ -213,12 +220,65 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
   return null
 }
 
+function MapCenterOnUser({
+  coords,
+  shouldCenter,
+  onCentered,
+}: {
+  coords: { lat: number; lng: number } | null
+  shouldCenter: boolean
+  onCentered: () => void
+}) {
+  const { useMap } = require("react-leaflet")
+  const map = useMap()
+
+  useEffect(() => {
+    if (shouldCenter && coords) {
+      map.setView([coords.lat, coords.lng], 15, { animate: true })
+      onCentered()
+    }
+  }, [shouldCenter, coords, map, onCentered])
+
+  return null
+}
+
 export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
   const [mapKey, setMapKey] = useState(0)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [shouldCenterOnUser, setShouldCenterOnUser] = useState(false)
+
+  const { user, profile, refreshProfile } = useAuth()
+
+  // Get persisted permission from profile, default to 'unknown'
+  const persistedPermission: LocationPermission = profile?.locationPermission ?? "unknown"
+
+  // Handle permission changes by persisting to database
+  const handlePermissionChange = useCallback(
+    async (newPermission: LocationPermission) => {
+      if (!user) return
+      try {
+        await updateLocationPermission(user.id, newPermission)
+        await refreshProfile()
+      } catch (error) {
+        console.error("Failed to update location permission:", error)
+      }
+    },
+    [user, refreshProfile]
+  )
+
+  const { coords, accuracy, permission, browserPermission, isLoading, requestPermission, retryPermission } =
+    useUserLocation({
+      persistedPermission,
+      onPermissionChange: handlePermissionChange,
+    })
 
   useEffect(() => {
     setIsMounted(true)
+    // Check if banner was previously dismissed (only for 'unknown' state)
+    if (typeof window !== "undefined") {
+      setBannerDismissed(localStorage.getItem("location-banner-dismissed") === "true")
+    }
   }, [])
 
   // Leaflet can throw "Map container is being reused by another instance" in dev
@@ -254,6 +314,21 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
 
   const mode: "city_compare" | "city_detail" = navigation?.cityId ? "city_detail" : "city_compare"
 
+  const handleDismissBanner = useCallback(() => {
+    setBannerDismissed(true)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("location-banner-dismissed", "true")
+    }
+  }, [])
+
+  const handleCenterOnUser = useCallback(() => {
+    setShouldCenterOnUser(true)
+  }, [])
+
+  const handleCentered = useCallback(() => {
+    setShouldCenterOnUser(false)
+  }, [])
+
   if (!isMounted) {
     return (
       <div className="rounded-lg border border-border bg-card p-8">
@@ -271,7 +346,7 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
         <p className="mt-1 text-sm text-muted-foreground">Interactive map of your saved spots</p>
         {missingCoordsCount > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">
-            {missingCoordsCount} {missingCoordsCount === 1 ? "spot is" : "spots are"} missing map coordinates and won’t appear on the map until a location is selected.
+            {missingCoordsCount} {missingCoordsCount === 1 ? "spot is" : "spots are"} missing map coordinates and won't appear on the map until a location is selected.
           </p>
         )}
         {visibleSpotsWithCoords.length === 0 && visibleSpots.length > 0 && (
@@ -281,8 +356,28 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
         )}
       </div>
 
+      {/* Location permission banner */}
+      {!bannerDismissed && (
+        <LocationPermissionBanner
+          permission={permission}
+          onRequestPermission={requestPermission}
+          onDismiss={handleDismissBanner}
+        />
+      )}
+
       {/* Interactive Leaflet Map */}
       <div className="relative h-[600px] overflow-hidden rounded-lg">
+        {/* Location button overlay */}
+        <LocationButton
+          permission={permission}
+          browserPermission={browserPermission}
+          isLoading={isLoading}
+          hasLocation={!!coords}
+          onRequestPermission={requestPermission}
+          onRetryPermission={retryPermission}
+          onCenterOnUser={handleCenterOnUser}
+        />
+
         <div id={`map-container-${mapKey}`} className="h-full w-full" style={{ background: "hsl(var(--muted))" }}>
           <MapContainer
             center={[20, 0]}
@@ -303,6 +398,12 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
             />
             <MapBounds spots={spots} navigation={navigation} />
             <MapMarkers mode={mode} spots={visibleSpotsWithCoords} onSpotClick={onSpotClick} />
+            {coords && <UserLocationMarker coords={coords} />}
+            <MapCenterOnUser
+              coords={coords}
+              shouldCenter={shouldCenterOnUser}
+              onCentered={handleCentered}
+            />
           </MapContainer>
         </div>
       </div>

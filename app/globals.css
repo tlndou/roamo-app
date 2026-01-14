@@ -123,3 +123,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* User location marker pulse animation */
+@keyframes user-location-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}

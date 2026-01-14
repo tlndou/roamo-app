@@ -20,6 +20,7 @@ export interface Database {
           base_lng: number | null
           birthdate: string | null
           zodiac_sign: string | null
+          location_permission: "unknown" | "granted" | "denied"
           created_at: string
           updated_at: string
         }
@@ -39,6 +40,7 @@ export interface Database {
           base_lng?: number | null
           birthdate?: string | null
           zodiac_sign?: string | null
+          location_permission?: "unknown" | "granted" | "denied"
         }
         Update: {
           email?: string | null
@@ -55,6 +57,7 @@ export interface Database {
           base_lng?: number | null
           birthdate?: string | null
           zodiac_sign?: string | null
+          location_permission?: "unknown" | "granted" | "denied"
           updated_at?: string
         }
       }

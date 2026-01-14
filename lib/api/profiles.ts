@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { calculateZodiacSign } from "@/lib/zodiac-utils"
-import type { Profile, ProfileUpdate } from "@/types/profile"
+import type { Profile, ProfileUpdate, LocationPermission } from "@/types/profile"
 import type { Database } from "@/types/supabase"
 import { canonicalizeCity } from "@/lib/geo/canonical-city"
 import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
@@ -37,6 +37,7 @@ export function transformDbProfile(dbProfile: DbProfile): Profile {
     avatarUrl: dbProfile.avatar_url,
     birthdate: dbProfile.birthdate,
     zodiacSign: dbProfile.zodiac_sign,
+    locationPermission: dbProfile.location_permission || "unknown",
     createdAt: dbProfile.created_at,
     updatedAt: dbProfile.updated_at,
   }
@@ -171,4 +172,22 @@ export async function deleteAvatar(avatarUrl: string): Promise<void> {
   if (!path) return
 
   await supabase.storage.from("avatars").remove([path])
+}
+
+// Update location permission setting
+export async function updateLocationPermission(
+  userId: string,
+  permission: LocationPermission
+): Promise<void> {
+  const supabase = createClient()
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      location_permission: permission,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+
+  if (error) throw error
 }
