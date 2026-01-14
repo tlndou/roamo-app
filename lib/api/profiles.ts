@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { calculateZodiacSign } from "@/lib/zodiac-utils"
-import type { Profile, ProfileUpdate, LocationPermission } from "@/types/profile"
+import type { Profile, ProfileUpdate, LocationPermission, CurrentLocation } from "@/types/profile"
 import type { Database } from "@/types/supabase"
 import { canonicalizeCity } from "@/lib/geo/canonical-city"
 import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
@@ -38,8 +38,26 @@ export function transformDbProfile(dbProfile: DbProfile): Profile {
     birthdate: dbProfile.birthdate,
     zodiacSign: dbProfile.zodiac_sign,
     locationPermission: dbProfile.location_permission || "unknown",
+    currentLocation: buildCurrentLocation(dbProfile),
     createdAt: dbProfile.created_at,
     updatedAt: dbProfile.updated_at,
+  }
+}
+
+function buildCurrentLocation(dbProfile: DbProfile): CurrentLocation | null {
+  const hasCoords = dbProfile.current_lat != null && dbProfile.current_lng != null
+  const hasAnyData = dbProfile.current_city || dbProfile.current_country || hasCoords
+
+  if (!hasAnyData) return null
+
+  return {
+    city: dbProfile.current_city,
+    country: dbProfile.current_country,
+    coordinates: hasCoords
+      ? { lat: Number(dbProfile.current_lat), lng: Number(dbProfile.current_lng) }
+      : null,
+    lastSeenCity: dbProfile.last_seen_city,
+    updatedAt: dbProfile.location_updated_at,
   }
 }
 
@@ -185,6 +203,46 @@ export async function updateLocationPermission(
     .from("profiles")
     .update({
       location_permission: permission,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+
+  if (error) throw error
+}
+
+// Update current location from reverse geocoding
+export interface CurrentLocationUpdate {
+  city: string | null
+  country: string | null
+  lat: number
+  lng: number
+}
+
+export async function updateCurrentLocation(
+  userId: string,
+  location: CurrentLocationUpdate
+): Promise<void> {
+  const supabase = createClient()
+
+  // First fetch current city to set as last_seen_city if it changes
+  const { data: currentProfile } = await supabase
+    .from("profiles")
+    .select("current_city")
+    .eq("id", userId)
+    .single()
+
+  const previousCity = currentProfile?.current_city
+  const cityChanged = previousCity && previousCity !== location.city
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      current_city: location.city,
+      current_country: location.country,
+      current_lat: location.lat,
+      current_lng: location.lng,
+      last_seen_city: cityChanged ? previousCity : undefined,
+      location_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", userId)

@@ -6,6 +6,7 @@ import type { Spot } from "@/types/spot"
 import type { LocationPermission } from "@/types/profile"
 import { getCountryContinent } from "@/lib/country-utils"
 import { useUserLocation } from "@/hooks/use-user-location"
+import { useMapLocationTracking } from "@/hooks/use-map-location-tracking"
 import { useAuth } from "@/components/providers/auth-provider"
 import { updateLocationPermission } from "@/lib/api/profiles"
 import { LocationButton } from "@/components/user-location/location-button"
@@ -267,11 +268,18 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
     [user, refreshProfile]
   )
 
-  const { coords, accuracy, permission, browserPermission, isLoading, requestPermission, retryPermission } =
+  // Permission handling hook (doesn't actively track position)
+  const { permission, browserPermission, isLoading, requestPermission, retryPermission } =
     useUserLocation({
       persistedPermission,
       onPermissionChange: handlePermissionChange,
     })
+
+  // Live location tracking for the map marker (only when map is active)
+  const { coords: mapCoords, isTracking } = useMapLocationTracking({
+    isMapActive: isMounted,
+    locationPermission: permission,
+  })
 
   useEffect(() => {
     setIsMounted(true)
@@ -371,8 +379,8 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
         <LocationButton
           permission={permission}
           browserPermission={browserPermission}
-          isLoading={isLoading}
-          hasLocation={!!coords}
+          isLoading={isLoading || isTracking}
+          hasLocation={!!mapCoords}
           onRequestPermission={requestPermission}
           onRetryPermission={retryPermission}
           onCenterOnUser={handleCenterOnUser}
@@ -398,9 +406,9 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
             />
             <MapBounds spots={spots} navigation={navigation} />
             <MapMarkers mode={mode} spots={visibleSpotsWithCoords} onSpotClick={onSpotClick} />
-            {coords && <UserLocationMarker coords={coords} />}
+            {mapCoords && <UserLocationMarker coords={mapCoords} />}
             <MapCenterOnUser
-              coords={coords}
+              coords={mapCoords}
               shouldCenter={shouldCenterOnUser}
               onCentered={handleCentered}
             />

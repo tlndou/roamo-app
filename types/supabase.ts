@@ -21,6 +21,12 @@ export interface Database {
           birthdate: string | null
           zodiac_sign: string | null
           location_permission: "unknown" | "granted" | "denied"
+          current_city: string | null
+          current_country: string | null
+          current_lat: number | null
+          current_lng: number | null
+          last_seen_city: string | null
+          location_updated_at: string | null
           created_at: string
           updated_at: string
         }
@@ -41,6 +47,12 @@ export interface Database {
           birthdate?: string | null
           zodiac_sign?: string | null
           location_permission?: "unknown" | "granted" | "denied"
+          current_city?: string | null
+          current_country?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
+          last_seen_city?: string | null
+          location_updated_at?: string | null
         }
         Update: {
           email?: string | null
@@ -58,6 +70,12 @@ export interface Database {
           birthdate?: string | null
           zodiac_sign?: string | null
           location_permission?: "unknown" | "granted" | "denied"
+          current_city?: string | null
+          current_country?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
+          last_seen_city?: string | null
+          location_updated_at?: string | null
           updated_at?: string
         }
       }

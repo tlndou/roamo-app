@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/providers/auth-provider"
+import { LocationResolutionProvider } from "@/components/providers/location-resolution-provider"
 import { Header } from "@/components/layout/header"
 import { OnboardingDialog } from "@/components/profile/onboarding-dialog"
 import { Toaster } from "sonner"
@@ -42,10 +43,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <AuthProvider>
-          <Header />
-          {children}
-          <OnboardingDialog />
-          <Toaster />
+          <LocationResolutionProvider>
+            <Header />
+            {children}
+            <OnboardingDialog />
+            <Toaster />
+          </LocationResolutionProvider>
         </AuthProvider>
         <Analytics />
       </body>

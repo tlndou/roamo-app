@@ -13,8 +13,6 @@ export interface UseUserLocationOptions {
 }
 
 export interface UseUserLocationResult {
-  coords: { lat: number; lng: number } | null
-  accuracy: number | null
   /** The effective permission state (combines persisted + browser state) */
   permission: LocationPermission
   /** Browser's actual permission state */
@@ -26,15 +24,16 @@ export interface UseUserLocationResult {
   retryPermission: () => void
 }
 
+/**
+ * Hook for managing location permission state.
+ * Does NOT actively track position - use useMapLocationTracking for that.
+ */
 export function useUserLocation({
   persistedPermission,
   onPermissionChange,
 }: UseUserLocationOptions): UseUserLocationResult {
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [accuracy, setAccuracy] = useState<number | null>(null)
   const [browserPermission, setBrowserPermission] = useState<BrowserPermissionState>("prompt")
   const [isLoading, setIsLoading] = useState(false)
-  const watchIdRef = useRef<number | null>(null)
   const hasAttemptedRef = useRef(false)
 
   // Check browser permission state without triggering prompt
@@ -71,55 +70,14 @@ export function useUserLocation({
     }
   }, [persistedPermission, onPermissionChange])
 
-  // Auto-start watching if persisted permission is granted and browser allows it
+  // Sync persisted permission with browser state on mount
   useEffect(() => {
     if (typeof window === "undefined") return
     if (!("geolocation" in navigator)) return
 
-    // Only auto-watch if we have persisted granted permission
-    if (persistedPermission !== "granted") return
-    // And browser hasn't denied
-    if (browserPermission === "denied" || browserPermission === "unavailable") {
-      // Browser denied but we thought we had permission - update persisted state
-      if (browserPermission === "denied") {
-        onPermissionChange?.("denied")
-      }
-      return
-    }
-
-    setIsLoading(true)
-
-    const handleSuccess = (position: GeolocationPosition) => {
-      setCoords({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      })
-      setAccuracy(position.coords.accuracy)
-      setIsLoading(false)
-    }
-
-    const handleError = (error: GeolocationPositionError) => {
-      setIsLoading(false)
-      console.error("Geolocation error:", error.message)
-
-      if (error.code === error.PERMISSION_DENIED) {
-        setBrowserPermission("denied")
-        // Update persisted permission since browser denied
-        onPermissionChange?.("denied")
-      }
-    }
-
-    watchIdRef.current = navigator.geolocation.watchPosition(handleSuccess, handleError, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 5000,
-    })
-
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current)
-        watchIdRef.current = null
-      }
+    // If persisted says granted but browser says denied, update persisted
+    if (persistedPermission === "granted" && browserPermission === "denied") {
+      onPermissionChange?.("denied")
     }
   }, [persistedPermission, browserPermission, onPermissionChange])
 
@@ -141,13 +99,8 @@ export function useUserLocation({
     setIsLoading(true)
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      () => {
         setBrowserPermission("granted")
-        setCoords({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        })
-        setAccuracy(position.coords.accuracy)
         setIsLoading(false)
         // Persist the granted permission
         onPermissionChange?.("granted")
@@ -161,9 +114,9 @@ export function useUserLocation({
         }
       },
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: false,
         timeout: 10000,
-        maximumAge: 0,
+        maximumAge: 60000,
       }
     )
   }, [persistedPermission, onPermissionChange])
@@ -179,13 +132,8 @@ export function useUserLocation({
     setIsLoading(true)
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      () => {
         setBrowserPermission("granted")
-        setCoords({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        })
-        setAccuracy(position.coords.accuracy)
         setIsLoading(false)
         // Update persisted permission to granted
         onPermissionChange?.("granted")
@@ -201,7 +149,7 @@ export function useUserLocation({
         }
       },
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: false,
         timeout: 10000,
         maximumAge: 0,
       }
@@ -217,8 +165,6 @@ export function useUserLocation({
         : persistedPermission
 
   return {
-    coords,
-    accuracy,
     permission: effectivePermission,
     browserPermission,
     isLoading,

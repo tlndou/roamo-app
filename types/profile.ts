@@ -9,6 +9,14 @@ export interface BaseLocation {
 
 export type LocationPermission = "unknown" | "granted" | "denied"
 
+export interface CurrentLocation {
+  city: string | null
+  country: string | null
+  coordinates: { lat: number; lng: number } | null
+  lastSeenCity: string | null
+  updatedAt: string | null
+}
+
 export interface Profile {
   id: string
   email: string | null
@@ -20,6 +28,7 @@ export interface Profile {
   birthdate: string | null
   zodiacSign: string | null
   locationPermission: LocationPermission
+  currentLocation: CurrentLocation | null
   createdAt: string
   updatedAt: string
 }
