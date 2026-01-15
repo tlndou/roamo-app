@@ -9,8 +9,11 @@ export interface BaseLocation {
 
 export type LocationPermission = "unknown" | "granted" | "denied"
 
+export type HomeAwayStatus = "home" | "away" | "unknown"
+
 export interface CurrentLocation {
   city: string | null
+  canonicalCityId: string | null
   country: string | null
   coordinates: { lat: number; lng: number } | null
   lastSeenCity: string | null

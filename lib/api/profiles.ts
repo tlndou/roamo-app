@@ -52,6 +52,7 @@ function buildCurrentLocation(dbProfile: DbProfile): CurrentLocation | null {
 
   return {
     city: dbProfile.current_city,
+    canonicalCityId: dbProfile.current_canonical_city_id,
     country: dbProfile.current_country,
     coordinates: hasCoords
       ? { lat: Number(dbProfile.current_lat), lng: Number(dbProfile.current_lng) }
@@ -213,6 +214,7 @@ export async function updateLocationPermission(
 // Update current location from reverse geocoding
 export interface CurrentLocationUpdate {
   city: string | null
+  canonicalCityId: string | null
   country: string | null
   lat: number
   lng: number
@@ -238,6 +240,7 @@ export async function updateCurrentLocation(
     .from("profiles")
     .update({
       current_city: location.city,
+      current_canonical_city_id: location.canonicalCityId,
       current_country: location.country,
       current_lat: location.lat,
       current_lng: location.lng,

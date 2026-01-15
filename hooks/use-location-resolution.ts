@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react"
 import type { LocationPermission, CurrentLocation } from "@/types/profile"
 import { reverseGeocodeNominatim } from "@/lib/geo/reverse-geocode"
+import { canonicalizeCity } from "@/lib/geo/canonical-city"
 import { updateCurrentLocation, type CurrentLocationUpdate } from "@/lib/api/profiles"
 import { canonicalizeCountryName } from "@/lib/country-utils"
 
@@ -101,11 +102,11 @@ export function useLocationResolution({
         })
       })
     } catch (error) {
-      const errorMessage =
-        error instanceof GeolocationPositionError
-          ? getGeolocationErrorMessage(error)
-          : "Position unavailable"
-      console.error(LOG_PREFIX, "Position check failed", { error: errorMessage })
+      const geoError = error as GeolocationPositionError
+      const errorMessage = geoError?.code
+        ? getGeolocationErrorMessage(geoError)
+        : "Position unavailable"
+      console.error(LOG_PREFIX, "Position check failed:", errorMessage)
       setLastError(errorMessage)
       return
     }
@@ -209,14 +210,20 @@ export function useLocationResolution({
       const city = geocodeResult.canonicalCity || null
       const country = geocodeResult.country ? canonicalizeCountryName(geocodeResult.country) : null
 
+      // Compute canonical city ID for deterministic comparisons
+      const canonicalCityId =
+        city && country ? canonicalizeCity({ city, country }).canonicalCityId : null
+
       console.log(LOG_PREFIX, "Reverse geocode result", {
         city,
         country,
+        canonicalCityId,
         raw: geocodeResult.raw?.display_name,
       })
 
       const locationUpdate: CurrentLocationUpdate = {
         city,
+        canonicalCityId,
         country,
         lat: freshLat,
         lng: freshLng,
@@ -238,14 +245,18 @@ export function useLocationResolution({
 
       onLocationResolved?.(locationUpdate)
     } catch (error) {
-      const errorMessage =
-        error instanceof GeolocationPositionError
-          ? getGeolocationErrorMessage(error)
-          : error instanceof Error
-            ? error.message
-            : "Unknown error"
+      let errorMessage: string
+      if (error instanceof GeolocationPositionError) {
+        errorMessage = getGeolocationErrorMessage(error)
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === "object" && error !== null && "message" in error) {
+        errorMessage = String((error as { message: unknown }).message)
+      } else {
+        errorMessage = String(error) || "Unknown error"
+      }
 
-      console.error(LOG_PREFIX, "Location resolution failed", { reason, error: errorMessage })
+      console.error(LOG_PREFIX, "Location resolution failed:", errorMessage)
       setLastError(errorMessage)
     } finally {
       isResolvingRef.current = false

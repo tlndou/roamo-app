@@ -22,6 +22,7 @@ export interface Database {
           zodiac_sign: string | null
           location_permission: "unknown" | "granted" | "denied"
           current_city: string | null
+          current_canonical_city_id: string | null
           current_country: string | null
           current_lat: number | null
           current_lng: number | null
@@ -48,6 +49,7 @@ export interface Database {
           zodiac_sign?: string | null
           location_permission?: "unknown" | "granted" | "denied"
           current_city?: string | null
+          current_canonical_city_id?: string | null
           current_country?: string | null
           current_lat?: number | null
           current_lng?: number | null
@@ -71,6 +73,7 @@ export interface Database {
           zodiac_sign?: string | null
           location_permission?: "unknown" | "granted" | "denied"
           current_city?: string | null
+          current_canonical_city_id?: string | null
           current_country?: string | null
           current_lat?: number | null
           current_lng?: number | null
