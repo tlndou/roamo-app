@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddSpotDialog } from "@/components/add-spot-dialog"
@@ -10,19 +10,18 @@ import { ViewToggle } from "@/components/view-toggle"
 import { CategoryFilter } from "@/components/category-filter"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/components/providers/auth-provider"
+import { useLocationResolutionContext } from "@/components/providers/location-resolution-provider"
 import { fetchSpots, createSpot, deleteSpot, toggleSpotVisited, updateSpot } from "@/lib/api/spots"
 import { toast } from "sonner"
 import type { Spot } from "@/types/spot"
 import { SpotDetailsDialog } from "@/components/spot-details-dialog"
 import { getCountryContinent } from "@/lib/country-utils"
-
-interface NavigationState {
-  level: "continent" | "country" | "city" | "spots"
-  continent?: string
-  country?: string
-  cityId?: string
-  cityName?: string
-}
+import {
+  useLocationDiscovery,
+  saveLastView,
+  type NavigationState,
+  type DiscoveryResult,
+} from "@/hooks/use-location-discovery"
 
 function deriveInitialNavigation(spots: Spot[]): NavigationState {
   if (spots.length === 0) return { level: "continent" }
@@ -50,7 +49,8 @@ function deriveInitialNavigation(spots: Spot[]): NavigationState {
 }
 
 export default function Home() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
+  const { homeAwayStatus } = useLocationResolutionContext()
   const userId = user?.id ?? null
   const [spots, setSpots] = useState<Spot[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,6 +61,7 @@ export default function Home() {
   const [didInitNavigation, setDidInitNavigation] = useState(false)
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null)
   const [isSpotDetailsOpen, setIsSpotDetailsOpen] = useState(false)
+  const hasUserNavigatedRef = useRef(false)
 
   useEffect(() => {
     // Avoid reloading (and showing the full-page skeleton) when Supabase refreshes the session
@@ -150,6 +151,49 @@ export default function Home() {
     return spots.filter((s) => s.category === selectedCategory)
   }, [spots, selectedCategory])
 
+  // Location-based discovery callback
+  const handleDiscovery = useCallback((result: DiscoveryResult) => {
+    // Don't override if user has already manually navigated
+    if (hasUserNavigatedRef.current) return
+
+    setView(result.view)
+    setNavigation(result.navigation)
+    setDidInitNavigation(true)
+
+    if (result.toastMessage) {
+      toast(result.toastMessage, {
+        duration: 6000,
+        action: {
+          label: "Add one",
+          onClick: () => setIsAddDialogOpen(true),
+        },
+      })
+    }
+  }, [])
+
+  // Location-based discovery hook
+  useLocationDiscovery({
+    spots,
+    currentLocation: profile?.currentLocation ?? null,
+    homeAwayStatus,
+    spotsLoaded: !loading && !authLoading,
+    onDiscover: handleDiscovery,
+  })
+
+  // View change handler with persistence
+  const handleViewChange = useCallback((newView: "list" | "map" | "explore") => {
+    hasUserNavigatedRef.current = true
+    setView(newView)
+    saveLastView(newView)
+  }, [])
+
+  // Navigation change handler
+  const handleNavigationChange = useCallback((nav: NavigationState) => {
+    hasUserNavigatedRef.current = true
+    setDidInitNavigation(true)
+    setNavigation(nav)
+  }, [])
+
   // Loading state
   if (authLoading || loading) {
     return (
@@ -197,7 +241,7 @@ export default function Home() {
         {/* Controls */}
         <div className="mb-8 flex items-center justify-between gap-4">
           <CategoryFilter selectedCategory={selectedCategory} onCategoryChange={setSelectedCategory} spots={spots} />
-          <ViewToggle view={view} onViewChange={setView} />
+          <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
 
         {/* Content */}
@@ -211,10 +255,7 @@ export default function Home() {
             onDeleteSpot={handleDeleteSpot}
             onToggleVisited={handleToggleVisited}
             navigation={navigation}
-            onNavigationChange={(nav) => {
-              setDidInitNavigation(true)
-              setNavigation(nav)
-            }}
+            onNavigationChange={handleNavigationChange}
             onSpotClick={handleSpotClick}
             mode="browse"
           />
@@ -224,10 +265,7 @@ export default function Home() {
             onDeleteSpot={handleDeleteSpot}
             onToggleVisited={handleToggleVisited}
             navigation={navigation}
-            onNavigationChange={(nav) => {
-              setDidInitNavigation(true)
-              setNavigation(nav)
-            }}
+            onNavigationChange={handleNavigationChange}
             onSpotClick={handleSpotClick}
             mode="all"
           />
