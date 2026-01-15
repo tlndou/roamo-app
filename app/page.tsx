@@ -7,7 +7,7 @@ import { AddSpotDialog } from "@/components/add-spot-dialog"
 import { ListView } from "@/components/list-view"
 import { MapView } from "@/components/map-view"
 import { ViewToggle } from "@/components/view-toggle"
-import { CategoryFilter } from "@/components/category-filter"
+import { SpotFilter, applySpotFilters, createDefaultFilter, type SpotFilterState } from "@/components/spot-filter"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/components/providers/auth-provider"
 import { useLocationResolutionContext } from "@/components/providers/location-resolution-provider"
@@ -56,7 +56,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [view, setView] = useState<"list" | "map" | "explore">("list")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [spotFilter, setSpotFilter] = useState<SpotFilterState>(createDefaultFilter)
   const [navigation, setNavigation] = useState<NavigationState>({ level: "continent" })
   const [didInitNavigation, setDidInitNavigation] = useState(false)
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null)
@@ -146,10 +146,25 @@ export default function Home() {
     }
   }
 
+  // Spots filtered by current navigation context (for filter counts)
+  const navigationFilteredSpots = useMemo(() => {
+    let result = spots
+    if (navigation.continent) {
+      result = result.filter((s) => (s.continent || getCountryContinent(s.country)) === navigation.continent)
+    }
+    if (navigation.country) {
+      result = result.filter((s) => s.country === navigation.country)
+    }
+    if (navigation.cityId) {
+      result = result.filter((s) => s.canonicalCityId === navigation.cityId)
+    }
+    return result
+  }, [spots, navigation])
+
+  // Final filtered spots (navigation + status/category filters)
   const filteredSpots = useMemo(() => {
-    if (selectedCategory === "all") return spots
-    return spots.filter((s) => s.category === selectedCategory)
-  }, [spots, selectedCategory])
+    return applySpotFilters(navigationFilteredSpots, spotFilter)
+  }, [navigationFilteredSpots, spotFilter])
 
   // Location-based discovery callback
   const handleDiscovery = useCallback((result: DiscoveryResult) => {
@@ -240,7 +255,7 @@ export default function Home() {
 
         {/* Controls */}
         <div className="mb-8 flex items-center justify-between gap-4">
-          <CategoryFilter selectedCategory={selectedCategory} onCategoryChange={setSelectedCategory} spots={spots} />
+          <SpotFilter filter={spotFilter} onFilterChange={setSpotFilter} spots={navigationFilteredSpots} />
           <ViewToggle view={view} onViewChange={handleViewChange} />
         </div>
 
