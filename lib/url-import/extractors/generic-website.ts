@@ -421,10 +421,11 @@ export class GenericWebsiteExtractor implements ProviderExtractor {
         !(heuristic as any)?._ambiguous &&
         !("googlePlaceId" in heuristic)
 
-      if (canResolvePlaceId && title) {
-        const places = await this.placesSearchText(`${title} ${heuristic.address}`)
+      if (canResolvePlaceId && title && heuristic.address) {
+        const heuristicAddress = heuristic.address
+        const places = await this.placesSearchText(`${title} ${heuristicAddress}`)
         const selection = Array.isArray(places)
-          ? this.selectPlaceCandidateByNameAddress(places, { title, address: heuristic.address })
+          ? this.selectPlaceCandidateByNameAddress(places, { title, address: heuristicAddress })
           : null
         if (selection?.place) {
           const place = selection.place

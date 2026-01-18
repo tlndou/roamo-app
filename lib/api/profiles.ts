@@ -141,7 +141,6 @@ export async function updateProfile(userId: string, updates: ProfileUpdate): Pro
   // (RLS must allow insert/update for the current user.)
   const upsertPayload: any = { id: userId, ...dbUpdates }
 
-  // @ts-expect-error - Supabase type inference issue with optional fields
   const { data, error } = await supabase.from("profiles").upsert(upsertPayload).select().single()
 
   if (error) throw error
@@ -202,6 +201,7 @@ export async function updateLocationPermission(
 
   const { error } = await supabase
     .from("profiles")
+    // @ts-ignore - Supabase type inference issue
     .update({
       location_permission: permission,
       updated_at: new Date().toISOString(),
@@ -231,13 +231,14 @@ export async function updateCurrentLocation(
     .from("profiles")
     .select("current_city")
     .eq("id", userId)
-    .single()
+    .single() as { data: { current_city: string | null } | null; error: any }
 
   const previousCity = currentProfile?.current_city
   const cityChanged = previousCity && previousCity !== location.city
 
   const { error } = await supabase
     .from("profiles")
+    // @ts-ignore - Supabase type inference issue
     .update({
       current_city: location.city,
       current_canonical_city_id: location.canonicalCityId,

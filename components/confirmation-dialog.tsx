@@ -38,7 +38,7 @@ const visitTimeOptions: { value: VisitTimeLabel; label: string }[] = [
 
 interface ConfirmationDialogProps {
   result: URLImportResult
-  onConfirm: (draft: Omit<Spot, "id">) => void
+  onConfirm: (draft: Omit<Spot, "id" | "createdAt">) => void
   onCancel: () => void
 }
 

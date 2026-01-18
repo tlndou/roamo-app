@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       .from("spots")
       .select("id, user_id, google_place_id, opening_hours_source")
       .eq("id", spotId)
-      .single()
+      .single() as { data: { id: string; user_id: string; google_place_id: string | null; opening_hours_source: string | null } | null; error: any }
 
     if (spotError || !spot) {
       return NextResponse.json({ error: "Spot not found" }, { status: 404 })
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const placeId = (spot as any).google_place_id as string | null
+    const placeId = spot.google_place_id
     if (!placeId) {
       return NextResponse.json({ error: "Spot has no google_place_id" }, { status: 400 })
     }
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
 
     const { data: updated, error: updateError } = await supabase
       .from("spots")
+      // @ts-ignore - Supabase type inference issue
       .update({
         opening_hours: openingHours as any,
         opening_hours_source: "google_places",

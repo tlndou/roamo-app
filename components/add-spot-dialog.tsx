@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 interface AddSpotDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAddSpot: (spot: Spot) => void
+  onAddSpot: (spot: Omit<Spot, "id" | "createdAt">) => void
 }
 
 const ADD_SPOT_MODE_KEY = "roamo:addSpot:mode:v1"
@@ -40,9 +40,8 @@ export function AddSpotDialog({ open, onOpenChange, onAddSpot }: AddSpotDialogPr
     }
   }, [mode])
 
-  const handleQuickAdd = (spot: Omit<Spot, "id">) => {
-    // Add ID to the spot before passing to parent
-    onAddSpot({ ...spot, id: Date.now().toString() })
+  const handleQuickAdd = (spot: Omit<Spot, "id" | "createdAt">) => {
+    onAddSpot(spot)
   }
 
   return (

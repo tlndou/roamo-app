@@ -13,7 +13,7 @@ import { ConfirmationDialog } from "./confirmation-dialog"
 import { toast } from "sonner"
 
 interface QuickAddFormProps {
-  onSubmit: (spot: Omit<Spot, "id">) => void
+  onSubmit: (spot: Omit<Spot, "id" | "createdAt">) => void
 }
 
 const QUICK_DRAFT_KEY = "roamo:addSpot:quickDraft:v1"
@@ -86,7 +86,7 @@ export function QuickAddForm({ onSubmit }: QuickAddFormProps) {
     }
   }
 
-  const handleConfirm = (confirmedDraft: Omit<Spot, "id">) => {
+  const handleConfirm = (confirmedDraft: Omit<Spot, "id" | "createdAt">) => {
     onSubmit(confirmedDraft)
     setImportResult(null)
     setUrl("")

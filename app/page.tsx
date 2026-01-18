@@ -21,7 +21,10 @@ import {
   saveLastView,
   type NavigationState,
   type DiscoveryResult,
+  type ViewType,
 } from "@/hooks/use-location-discovery"
+import { useHomeSuggestions } from "@/hooks/use-home-suggestions"
+import { HomeSuggestionBanner } from "@/components/home-suggestion-banner"
 
 function deriveInitialNavigation(spots: Spot[]): NavigationState {
   if (spots.length === 0) return { level: "continent" }
@@ -93,7 +96,7 @@ export default function Home() {
     }
   }
 
-  const handleAddSpot = async (spot: Spot) => {
+  const handleAddSpot = async (spot: Omit<Spot, "id" | "createdAt">) => {
     try {
       const newSpot = await createSpot(spot)
       setSpots([newSpot, ...spots])
@@ -209,6 +212,27 @@ export default function Home() {
     setNavigation(nav)
   }, [])
 
+  // Home suggestions navigation handler
+  const handleSuggestionNavigate = useCallback(
+    (newView: ViewType, filter: SpotFilterState, nav: NavigationState) => {
+      hasUserNavigatedRef.current = true
+      setView(newView)
+      setSpotFilter(filter)
+      setNavigation(nav)
+      setDidInitNavigation(true)
+      saveLastView(newView)
+    },
+    []
+  )
+
+  // Home city suggestions
+  const { suggestion, handleAction, handleDismiss } = useHomeSuggestions({
+    homeAwayStatus,
+    currentLocation: profile?.currentLocation ?? null,
+    spots,
+    onNavigate: handleSuggestionNavigate,
+  })
+
   // Loading state
   if (authLoading || loading) {
     return (
@@ -252,6 +276,15 @@ export default function Home() {
             Add Spot
           </Button>
         </div>
+
+        {/* Home Suggestion Banner */}
+        {suggestion && (
+          <HomeSuggestionBanner
+            suggestion={suggestion}
+            onAction={handleAction}
+            onDismiss={handleDismiss}
+          />
+        )}
 
         {/* Controls */}
         <div className="mb-8 flex items-center justify-between gap-4">

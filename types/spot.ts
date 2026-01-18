@@ -91,4 +91,6 @@ export interface Spot {
     lat: number
     lng: number
   }
+  /** ISO timestamp when spot was created */
+  createdAt: string
 }

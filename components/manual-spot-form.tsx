@@ -18,7 +18,7 @@ import { getCountryContinent } from "@/lib/country-utils"
 import { cn } from "@/lib/utils"
 
 interface ManualSpotFormProps {
-  onSubmit: (spot: Spot) => void
+  onSubmit: (spot: Omit<Spot, "id" | "createdAt">) => void
 }
 
 const MANUAL_DRAFT_KEY = "roamo:addSpot:manualDraft:v1"
@@ -139,10 +139,7 @@ export function ManualSpotForm({ onSubmit }: ManualSpotFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
-    onSubmit({
-      id: Date.now().toString(),
-      ...formData,
-    })
+    onSubmit(formData)
     try {
       window.sessionStorage.removeItem(MANUAL_DRAFT_KEY)
     } catch {

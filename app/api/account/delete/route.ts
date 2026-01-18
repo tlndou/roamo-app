@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       .from("profiles")
       .select("username, avatar_url")
       .eq("id", user.id)
-      .single()
+      .single() as { data: { username: string | null; avatar_url: string | null } | null; error: any }
 
     if (profileError || !profile?.username) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })

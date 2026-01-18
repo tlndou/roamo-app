@@ -64,6 +64,7 @@ export function transformDbSpot(dbSpot: DbSpot): Spot {
       lat: Number(dbSpot.lat),
       lng: Number(dbSpot.lng),
     },
+    createdAt: dbSpot.created_at,
   }
 }
 
@@ -144,7 +145,7 @@ export async function fetchSpots(): Promise<Spot[]> {
   return data.map(transformDbSpot)
 }
 
-export async function createSpot(spot: Omit<Spot, "id">): Promise<Spot> {
+export async function createSpot(spot: Omit<Spot, "id" | "createdAt">): Promise<Spot> {
   const supabase = createClient()
 
   const {
@@ -152,8 +153,8 @@ export async function createSpot(spot: Omit<Spot, "id">): Promise<Spot> {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Not authenticated")
 
-  // Create a temporary spot with ID for transformation
-  const spotWithId = { ...spot, id: "temp" }
+  // Create a temporary spot with ID for transformation (createdAt is set by DB)
+  const spotWithId = { ...spot, id: "temp", createdAt: new Date().toISOString() }
   const dbSpot = transformToDbSpot(spotWithId, user.id)
 
   // @ts-expect-error - Supabase type inference issue with optional fields

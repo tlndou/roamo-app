@@ -326,7 +326,7 @@ function cleanTitleCandidate(
   const norm = normalizeSiteToken(s)
   const bad = new Set(
     [site, host, site ? normalizeSiteToken(site) : "", host ? normalizeSiteToken(host) : ""]
-      .filter(Boolean)
+      .filter((x): x is string => Boolean(x))
       .map((x) => normalizeSiteToken(x))
   )
   if (bad.has(norm)) return undefined
