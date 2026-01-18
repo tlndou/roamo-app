@@ -11,6 +11,8 @@ export type LocationPermission = "unknown" | "granted" | "denied"
 
 export type HomeAwayStatus = "home" | "away" | "unknown"
 
+export type PushPermission = "default" | "granted" | "denied" | "unsupported"
+
 export interface CurrentLocation {
   city: string | null
   canonicalCityId: string | null
@@ -32,6 +34,10 @@ export interface Profile {
   zodiacSign: string | null
   locationPermission: LocationPermission
   currentLocation: CurrentLocation | null
+  /** Push notification permission status */
+  pushPermission: PushPermission
+  /** Whether user has been asked for push permission */
+  pushAsked: boolean
   createdAt: string
   updatedAt: string
 }

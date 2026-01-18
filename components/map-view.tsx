@@ -171,50 +171,63 @@ function MapBounds({ spots, navigation }: { spots: Spot[]; navigation?: Navigati
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (!map || !map.getContainer()) return
 
     // Leaflet commonly needs a resize invalidation when its container becomes visible (e.g. switching tabs/views).
     // This helps avoid "blank/solid" map tiles until interaction.
     const timeoutId = window.setTimeout(() => {
       try {
-        map.invalidateSize()
+        if (map && map.getContainer()) {
+          map.invalidateSize()
+        }
       } catch {
-        // ignore
+        // ignore - map may have been unmounted
       }
-    }, 0)
+    }, 100)
 
-    if (spots.length > 0) {
-      const L = require("leaflet")
+    // Delay bounds fitting to ensure map is ready
+    const boundsTimeoutId = window.setTimeout(() => {
+      try {
+        if (!map || !map.getContainer()) return
 
-      // Filter spots based on navigation
-      let filteredSpots = spots
-      if (navigation) {
-        if (navigation.continent) {
-          filteredSpots = spots.filter((s) => (s.continent || getCountryContinent(s.country)) === navigation.continent)
+        if (spots.length > 0) {
+          const L = require("leaflet")
+
+          // Filter spots based on navigation
+          let filteredSpots = spots
+          if (navigation) {
+            if (navigation.continent) {
+              filteredSpots = spots.filter((s) => (s.continent || getCountryContinent(s.country)) === navigation.continent)
+            }
+            if (navigation.country) {
+              filteredSpots = filteredSpots.filter((s) => s.country === navigation.country)
+            }
+            if (navigation.cityId) {
+              filteredSpots = filteredSpots.filter((s) => cityIdOf(s) === navigation.cityId)
+            }
+          }
+
+          if (filteredSpots.length > 0) {
+            const coords = filteredSpots
+              .map((spot: Spot) => [Number(spot.coordinates.lat), Number(spot.coordinates.lng)] as const)
+              .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0))
+            if (coords.length === 0) return
+
+            const bounds = L.latLngBounds(coords)
+            map.fitBounds(bounds, { padding: [50, 50] })
+          }
+        } else {
+          // No spots for the current navigation filter: reset to world view.
+          map.setView([20, 0], 2)
         }
-        if (navigation.country) {
-          filteredSpots = filteredSpots.filter((s) => s.country === navigation.country)
-        }
-        if (navigation.cityId) {
-          filteredSpots = filteredSpots.filter((s) => cityIdOf(s) === navigation.cityId)
-        }
+      } catch {
+        // ignore - map may have been unmounted or not ready
       }
-
-      if (filteredSpots.length > 0) {
-        const coords = filteredSpots
-          .map((spot: Spot) => [Number(spot.coordinates.lat), Number(spot.coordinates.lng)] as const)
-          .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0))
-        if (coords.length === 0) return
-
-        const bounds = L.latLngBounds(coords)
-        map.fitBounds(bounds, { padding: [50, 50] })
-      }
-    } else {
-      // No spots for the current navigation filter: reset to world view.
-      map.setView([20, 0], 2)
-    }
+    }, 150)
 
     return () => {
       window.clearTimeout(timeoutId)
+      window.clearTimeout(boundsTimeoutId)
     }
   }, [spots, navigation, map])
 
@@ -282,20 +295,14 @@ export function MapView({ spots, navigation, onSpotClick }: MapViewProps) {
   })
 
   useEffect(() => {
+    // Generate a unique key on mount to avoid Leaflet container reuse issues
+    setMapKey(Date.now())
     setIsMounted(true)
     // Check if banner was previously dismissed (only for 'unknown' state)
     if (typeof window !== "undefined") {
       setBannerDismissed(localStorage.getItem("location-banner-dismissed") === "true")
     }
   }, [])
-
-  // Leaflet can throw "Map container is being reused by another instance" in dev
-  // when this component is mounted/unmounted quickly (e.g. view toggles, React strict mode, HMR).
-  // Forcing the MapContainer to remount onto a fresh DOM node avoids reusing an old Leaflet container.
-  useEffect(() => {
-    if (!isMounted) return
-    setMapKey((k) => k + 1)
-  }, [isMounted])
 
   const visibleSpots = useMemo(() => {
     if (!navigation) return spots
@@ -441,23 +448,42 @@ function MapMarkers({
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (!map || !map.getContainer()) return
 
     const bump = () => setMapTick((t) => t + 1)
     bump()
-    map.on("zoomend", bump)
-    map.on("moveend", bump)
+
+    try {
+      map.on("zoomend", bump)
+      map.on("moveend", bump)
+    } catch {
+      // ignore - map may not be ready
+    }
+
     return () => {
-      map.off("zoomend", bump)
-      map.off("moveend", bump)
+      try {
+        map.off("zoomend", bump)
+        map.off("moveend", bump)
+      } catch {
+        // ignore - map may have been unmounted
+      }
     }
   }, [map])
 
   const clusters: Cluster[] = useMemo(() => {
     if (mode === "city_compare") return computeCityClusters(spots)
 
-    const z = map.getZoom?.() ?? 0
-    const threshold = z >= 14 ? 14 : z >= 11 ? 22 : 30
-    return computePixelClusters(spots, map, threshold)
+    // Guard against invalid map state
+    if (!map || !map.getContainer()) return computeCityClusters(spots)
+
+    try {
+      const z = map.getZoom?.() ?? 0
+      const threshold = z >= 14 ? 14 : z >= 11 ? 22 : 30
+      return computePixelClusters(spots, map, threshold)
+    } catch {
+      // Fallback to city clusters if pixel clustering fails
+      return computeCityClusters(spots)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, spots, map, mapTick])
 

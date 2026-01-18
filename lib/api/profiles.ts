@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { calculateZodiacSign } from "@/lib/zodiac-utils"
-import type { Profile, ProfileUpdate, LocationPermission, CurrentLocation } from "@/types/profile"
+import type { Profile, ProfileUpdate, LocationPermission, CurrentLocation, PushPermission } from "@/types/profile"
 import type { Database } from "@/types/supabase"
 import { canonicalizeCity } from "@/lib/geo/canonical-city"
 import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
@@ -39,6 +39,8 @@ export function transformDbProfile(dbProfile: DbProfile): Profile {
     zodiacSign: dbProfile.zodiac_sign,
     locationPermission: dbProfile.location_permission || "unknown",
     currentLocation: buildCurrentLocation(dbProfile),
+    pushPermission: ((dbProfile as any).push_permission as PushPermission) || "default",
+    pushAsked: (dbProfile as any).push_asked ?? false,
     createdAt: dbProfile.created_at,
     updatedAt: dbProfile.updated_at,
   }
@@ -247,6 +249,27 @@ export async function updateCurrentLocation(
       current_lng: location.lng,
       last_seen_city: cityChanged ? previousCity : undefined,
       location_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+
+  if (error) throw error
+}
+
+// Update push notification permission status
+export async function updatePushPermission(
+  userId: string,
+  permission: PushPermission,
+  asked: boolean
+): Promise<void> {
+  const supabase = createClient()
+
+  const { error } = await supabase
+    .from("profiles")
+    // @ts-ignore - Supabase type inference issue
+    .update({
+      push_permission: permission,
+      push_asked: asked,
       updated_at: new Date().toISOString(),
     })
     .eq("id", userId)

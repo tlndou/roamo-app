@@ -106,7 +106,7 @@ export function useLocationResolution({
       const errorMessage = geoError?.code
         ? getGeolocationErrorMessage(geoError)
         : "Position unavailable"
-      console.error(LOG_PREFIX, "Position check failed:", errorMessage)
+      console.warn(LOG_PREFIX, "Position check failed:", errorMessage)
       setLastError(errorMessage)
       return
     }
@@ -256,7 +256,7 @@ export function useLocationResolution({
         errorMessage = String(error) || "Unknown error"
       }
 
-      console.error(LOG_PREFIX, "Location resolution failed:", errorMessage)
+      console.warn(LOG_PREFIX, "Location resolution failed:", errorMessage)
       setLastError(errorMessage)
     } finally {
       isResolvingRef.current = false

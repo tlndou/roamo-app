@@ -12,7 +12,7 @@ interface HomeSuggestionBannerProps {
 
 export function HomeSuggestionBanner({ suggestion, onAction, onDismiss }: HomeSuggestionBannerProps) {
   return (
-    <div className="mb-6 rounded-lg border border-border bg-muted/50 p-4">
+    <div className="relative z-10 mb-6 rounded-lg border border-border bg-muted/50 p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 rounded-full bg-primary/10 p-2">

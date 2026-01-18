@@ -25,6 +25,8 @@ import {
 } from "@/hooks/use-location-discovery"
 import { useHomeSuggestions } from "@/hooks/use-home-suggestions"
 import { HomeSuggestionBanner } from "@/components/home-suggestion-banner"
+import { usePushNotificationFlow } from "@/hooks/use-push-notification-flow"
+import { PushPermissionDialog } from "@/components/push-permission-dialog"
 
 function deriveInitialNavigation(spots: Spot[]): NavigationState {
   if (spots.length === 0) return { level: "continent" }
@@ -198,12 +200,29 @@ export default function Home() {
     onDiscover: handleDiscovery,
   })
 
+  // Push notification permission flow
+  const {
+    shouldShowDialog: shouldShowPushDialog,
+    onMapExploreView,
+    onAccept: onPushAccept,
+    onDecline: onPushDecline,
+  } = usePushNotificationFlow({
+    userId,
+    pushPermission: profile?.pushPermission ?? "default",
+    pushAsked: profile?.pushAsked ?? false,
+    spotsCount: spots.length,
+  })
+
   // View change handler with persistence
   const handleViewChange = useCallback((newView: "list" | "map" | "explore") => {
     hasUserNavigatedRef.current = true
     setView(newView)
     saveLastView(newView)
-  }, [])
+    // Track map/explore view for push notification eligibility
+    if (newView === "map" || newView === "explore") {
+      onMapExploreView()
+    }
+  }, [onMapExploreView])
 
   // Navigation change handler
   const handleNavigationChange = useCallback((nav: NavigationState) => {
@@ -331,6 +350,11 @@ export default function Home() {
         }}
         spot={selectedSpot}
         onSave={handleUpdateSpot}
+      />
+      <PushPermissionDialog
+        open={shouldShowPushDialog}
+        onAccept={onPushAccept}
+        onDecline={onPushDecline}
       />
     </main>
   )

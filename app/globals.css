@@ -135,3 +135,17 @@
     opacity: 0;
   }
 }
+
+/* Constrain Leaflet map z-index to prevent overlapping UI elements */
+.leaflet-container {
+  z-index: 0;
+}
+
+.leaflet-pane {
+  z-index: 0;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10;
+}

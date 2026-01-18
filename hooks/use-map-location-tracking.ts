@@ -63,7 +63,7 @@ export function useMapLocationTracking({
     }
 
     const handleError = (error: GeolocationPositionError) => {
-      console.error(LOG_PREFIX, "Watch position error", { code: error.code, message: error.message })
+      console.warn(LOG_PREFIX, "Watch position error:", error.code, error.message)
       setLastError(getErrorMessage(error))
 
       // Don't stop tracking on transient errors
