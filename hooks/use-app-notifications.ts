@@ -110,37 +110,37 @@ export function useAppNotifications({
 
     // Skip if permission not granted
     if (pushPermission !== "granted") {
-      console.log(LOG_PREFIX, "Skipping - push permission not granted")
+      // console.log(LOG_PREFIX, "Skipping - push permission not granted")
       return
     }
 
     // Skip if notifications not supported
     if (!canShowNotifications()) {
-      console.log(LOG_PREFIX, "Skipping - notifications not supported")
+      // console.log(LOG_PREFIX, "Skipping - notifications not supported")
       return
     }
 
     // Skip if no recent app opens
     if (!hasRecentAppOpen()) {
-      console.log(LOG_PREFIX, "Skipping - no recent app open")
+      // console.log(LOG_PREFIX, "Skipping - no recent app open")
       return
     }
 
     // Skip if rate limited
     if (!isWithinRateLimit()) {
-      console.log(LOG_PREFIX, "Skipping - rate limited")
+      // console.log(LOG_PREFIX, "Skipping - rate limited")
       return
     }
 
     // Skip if not a good time
     if (!isGoodTimeForNotification(homeAwayStatus)) {
-      console.log(LOG_PREFIX, "Skipping - not optimal timing")
+      // console.log(LOG_PREFIX, "Skipping - not optimal timing")
       return
     }
 
     // Skip if status unknown
     if (homeAwayStatus === "unknown") {
-      console.log(LOG_PREFIX, "Skipping - home/away status unknown")
+      // console.log(LOG_PREFIX, "Skipping - home/away status unknown")
       return
     }
 
@@ -234,7 +234,7 @@ export function useAppNotifications({
     if (notificationType && copy) {
       const interpolatedCopy = interpolateCopy(copy, variables)
 
-      console.log(LOG_PREFIX, "Triggering notification:", notificationType, interpolatedCopy)
+      // console.log(LOG_PREFIX, "Triggering notification:", notificationType, interpolatedCopy)
 
       const shown = await showNotification(notificationType, interpolatedCopy, {
         onClick: () => onNotificationAction?.(notificationType!),

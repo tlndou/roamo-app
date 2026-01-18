@@ -83,7 +83,7 @@ export function usePushNotificationFlow({
   // Track map/explore view
   const onMapExploreView = useCallback(() => {
     if (!hasViewedMap) {
-      console.log(LOG_PREFIX, "User viewed map/explore")
+      // console.log(LOG_PREFIX, "User viewed map/explore")
       markMapExploreViewed()
       setHasViewedMap(true)
     }
@@ -121,10 +121,10 @@ export function usePushNotificationFlow({
     const eligible = hasSavedSpot && hasViewedMapOrExplore
 
     if (eligible) {
-      console.log(LOG_PREFIX, "User eligible for push permission prompt", {
-        spotsCount,
-        hasViewedMap,
-      })
+      // console.log(LOG_PREFIX, "User eligible for push permission prompt", {
+      //   spotsCount,
+      //   hasViewedMap,
+      // })
     }
 
     return eligible
@@ -134,14 +134,14 @@ export function usePushNotificationFlow({
   const onAccept = useCallback(async () => {
     if (!userId) return
 
-    console.log(LOG_PREFIX, "User accepted push permission prompt")
+    // console.log(LOG_PREFIX, "User accepted push permission prompt")
 
     try {
       // Request browser permission
       const result = await Notification.requestPermission()
       const permission = result as PushPermission
 
-      console.log(LOG_PREFIX, "Browser permission result:", permission)
+      // console.log(LOG_PREFIX, "Browser permission result:", permission)
 
       // Update profile
       await updatePushPermission(userId, permission, true)
@@ -159,7 +159,7 @@ export function usePushNotificationFlow({
   const onDecline = useCallback(async () => {
     if (!userId) return
 
-    console.log(LOG_PREFIX, "User declined push permission prompt")
+    // console.log(LOG_PREFIX, "User declined push permission prompt")
 
     try {
       // Mark as asked but don't request browser permission

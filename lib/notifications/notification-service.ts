@@ -113,18 +113,18 @@ export async function showNotification(
 ): Promise<boolean> {
   // Check if notifications are supported and permitted
   if (!canShowNotifications()) {
-    console.log(LOG_PREFIX, "Cannot show notification - not supported or not permitted")
+    // console.log(LOG_PREFIX, "Cannot show notification - not supported or not permitted")
     return false
   }
 
   // Check rate limit
   if (!options?.skipRateLimit && !isWithinRateLimit()) {
-    console.log(LOG_PREFIX, "Skipping notification - rate limited (1 per day)")
+    // console.log(LOG_PREFIX, "Skipping notification - rate limited (1 per day)")
     return false
   }
 
   try {
-    console.log(LOG_PREFIX, "Showing notification:", type, copy.title)
+    // console.log(LOG_PREFIX, "Showing notification:", type, copy.title)
 
     const notification = new Notification(copy.title, {
       body: copy.body,
@@ -137,7 +137,7 @@ export async function showNotification(
 
     // Handle click
     notification.onclick = () => {
-      console.log(LOG_PREFIX, "Notification clicked:", type)
+      // console.log(LOG_PREFIX, "Notification clicked:", type)
       window.focus()
       notification.close()
       options?.onClick?.()
@@ -160,7 +160,7 @@ export function clearRateLimit(): void {
   if (typeof window === "undefined") return
   try {
     localStorage.removeItem(LAST_NOTIFICATION_KEY)
-    console.log(LOG_PREFIX, "Rate limit cleared")
+    // console.log(LOG_PREFIX, "Rate limit cleared")
   } catch {
     // Ignore
   }

@@ -112,10 +112,10 @@ export function useHomeSuggestions({
       unvisitedHomeCitySpots.length > 0 &&
       canShowSuggestion("weekend_planning")
     ) {
-      console.log(LOG_PREFIX, "Showing weekend_planning suggestion", {
-        unvisitedCount: unvisitedHomeCitySpots.length,
-        city: currentLocation?.city,
-      })
+      // console.log(LOG_PREFIX, "Showing weekend_planning suggestion", {
+      //   unvisitedCount: unvisitedHomeCitySpots.length,
+      //   city: currentLocation?.city,
+      // })
       return {
         type: "weekend_planning",
         message: "Need weekend plans? You've got a few saved spots nearby.",
@@ -125,10 +125,10 @@ export function useHomeSuggestions({
 
     // B. Mark as visited - has old unvisited spots
     if (oldUnvisitedSpots.length > 0 && canShowSuggestion("mark_visited")) {
-      console.log(LOG_PREFIX, "Showing mark_visited suggestion", {
-        oldUnvisitedCount: oldUnvisitedSpots.length,
-        city: currentLocation?.city,
-      })
+      // console.log(LOG_PREFIX, "Showing mark_visited suggestion", {
+      //   oldUnvisitedCount: oldUnvisitedSpots.length,
+      //   city: currentLocation?.city,
+      // })
       return {
         type: "mark_visited",
         message: "Did you end up going anywhere you saved?",
@@ -147,7 +147,7 @@ export function useHomeSuggestions({
     if (suggestion) {
       setActiveSuggestion(suggestion)
       markSuggestionShown(suggestion.type)
-      console.log(LOG_PREFIX, "suggestion_shown", { type: suggestion.type, city: currentLocation?.city })
+      // console.log(LOG_PREFIX, "suggestion_shown", { type: suggestion.type, city: currentLocation?.city })
     }
   }, [computeSuggestion, dismissed, currentLocation?.city])
 
@@ -159,7 +159,7 @@ export function useHomeSuggestions({
         if (suggestion) {
           setActiveSuggestion(suggestion)
           markSuggestionShown(suggestion.type)
-          console.log(LOG_PREFIX, "suggestion_shown (resume)", { type: suggestion.type, city: currentLocation?.city })
+          // console.log(LOG_PREFIX, "suggestion_shown (resume)", { type: suggestion.type, city: currentLocation?.city })
         }
       }
     }
@@ -172,7 +172,7 @@ export function useHomeSuggestions({
   const handleAction = useCallback(() => {
     if (!activeSuggestion || !currentLocation) return
 
-    console.log(LOG_PREFIX, "suggestion_clicked", { type: activeSuggestion.type, city: currentLocation.city })
+    // console.log(LOG_PREFIX, "suggestion_clicked", { type: activeSuggestion.type, city: currentLocation.city })
 
     const cityId = currentLocation.canonicalCityId
     const country = currentLocation.country
@@ -201,7 +201,7 @@ export function useHomeSuggestions({
   // Handle dismiss
   const handleDismiss = useCallback(() => {
     if (activeSuggestion) {
-      console.log(LOG_PREFIX, "suggestion_dismissed", { type: activeSuggestion.type, city: currentLocation?.city })
+      // console.log(LOG_PREFIX, "suggestion_dismissed", { type: activeSuggestion.type, city: currentLocation?.city })
     }
     setDismissed(true)
     setActiveSuggestion(null)
