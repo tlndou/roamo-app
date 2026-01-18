@@ -27,6 +27,8 @@ import { useHomeSuggestions } from "@/hooks/use-home-suggestions"
 import { HomeSuggestionBanner } from "@/components/home-suggestion-banner"
 import { usePushNotificationFlow } from "@/hooks/use-push-notification-flow"
 import { PushPermissionDialog } from "@/components/push-permission-dialog"
+import { useAppNotifications } from "@/hooks/use-app-notifications"
+import type { NotificationType } from "@/lib/notifications/notification-service"
 
 function deriveInitialNavigation(spots: Spot[]): NavigationState {
   if (spots.length === 0) return { level: "continent" }
@@ -250,6 +252,61 @@ export default function Home() {
     currentLocation: profile?.currentLocation ?? null,
     spots,
     onNavigate: handleSuggestionNavigate,
+  })
+
+  // Handle notification action clicks
+  const handleNotificationAction = useCallback((type: NotificationType) => {
+    // Navigate based on notification type
+    if (type.startsWith("home_")) {
+      // Home notifications - show unvisited spots in home city
+      if (profile?.currentLocation?.canonicalCityId) {
+        const continent = profile.currentLocation.country
+          ? getCountryContinent(profile.currentLocation.country)
+          : undefined
+        handleSuggestionNavigate(
+          "list",
+          { visited: false, unvisited: true, categories: new Set() },
+          {
+            level: "spots",
+            continent,
+            country: profile.currentLocation.country || undefined,
+            cityId: profile.currentLocation.canonicalCityId,
+            cityName: profile.currentLocation.city || undefined,
+          }
+        )
+      }
+    } else if (type === "away_city_spots" || type === "away_nearby_spots") {
+      // Away notifications with spots - show those spots
+      if (profile?.currentLocation?.canonicalCityId) {
+        const continent = profile.currentLocation.country
+          ? getCountryContinent(profile.currentLocation.country)
+          : undefined
+        handleSuggestionNavigate(
+          "list",
+          { visited: false, unvisited: false, categories: new Set() },
+          {
+            level: type === "away_city_spots" ? "spots" : "city",
+            continent,
+            country: profile.currentLocation.country || undefined,
+            cityId: type === "away_city_spots" ? profile.currentLocation.canonicalCityId : undefined,
+            cityName: type === "away_city_spots" ? (profile.currentLocation.city || undefined) : undefined,
+          }
+        )
+      }
+    } else if (type === "away_explore_prompt") {
+      // Explore prompt - open add spot dialog
+      setIsAddDialogOpen(true)
+    }
+  }, [profile?.currentLocation, handleSuggestionNavigate])
+
+  // App notifications (push notifications when permission granted)
+  useAppNotifications({
+    pushPermission: profile?.pushPermission ?? "default",
+    homeAwayStatus,
+    currentLocation: profile?.currentLocation ?? null,
+    spots,
+    spotsLoaded: !loading && !authLoading,
+    onNotificationAction: handleNotificationAction,
   })
 
   // Loading state
