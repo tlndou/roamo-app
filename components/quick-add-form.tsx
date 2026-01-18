@@ -103,8 +103,8 @@ export function QuickAddForm({ onSubmit }: QuickAddFormProps) {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="rounded-lg bg-muted p-4">
           <p className="text-sm text-muted-foreground">
-            Paste a link from Google Maps, Instagram, TikTok, or any
-            restaurant website to automatically extract spot details.
+            Paste a link (Google Maps, website, or social)
+            to help add details to your spot.
           </p>
         </div>
 
