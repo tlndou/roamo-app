@@ -34,10 +34,12 @@ export interface Profile {
   zodiacSign: string | null
   locationPermission: LocationPermission
   currentLocation: CurrentLocation | null
-  /** Push notification permission status */
+  /** Push notification permission status (device-level) */
   pushPermission: PushPermission
   /** Whether user has been asked for push permission */
   pushAsked: boolean
+  /** Whether notifications are enabled in the app (user preference) */
+  notificationsEnabled: boolean
   createdAt: string
   updatedAt: string
 }

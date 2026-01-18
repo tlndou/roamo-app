@@ -18,6 +18,7 @@ import type { Profile } from "@/types/profile"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LocationAutocomplete } from "@/components/location-autocomplete"
 import { canonicalizeCountryName, getCountryContinent } from "@/lib/country-utils"
+import { NotificationSettings } from "./notification-settings"
 
 interface ProfileFormProps {
   profile: Profile
@@ -271,6 +272,14 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         >
           Cancel
         </Button>
+      </div>
+
+      {/* Notifications */}
+      <div className="rounded-lg border border-border bg-card p-6">
+        <NotificationSettings
+          notificationsEnabled={profile.notificationsEnabled}
+          pushPermission={profile.pushPermission}
+        />
       </div>
 
       {/* Danger zone */}

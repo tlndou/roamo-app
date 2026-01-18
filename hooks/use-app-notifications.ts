@@ -24,6 +24,8 @@ const APP_OPEN_RECENCY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 export interface UseAppNotificationsOptions {
   /** User's push permission status from profile */
   pushPermission: PushPermission
+  /** Whether notifications are enabled in app settings */
+  notificationsEnabled: boolean
   /** Current home/away status */
   homeAwayStatus: HomeAwayStatus
   /** User's current location */
@@ -83,12 +85,14 @@ function isGoodTimeForNotification(homeAwayStatus: HomeAwayStatus): boolean {
 /**
  * Hook to handle app notifications based on location and user context.
  * Notifications only fire when:
- * - User has granted push permission
+ * - User has enabled notifications in app settings (notificationsEnabled)
+ * - User has granted push permission at device level
  * - App has been opened recently
  * - Rate limit allows (1 per day)
  */
 export function useAppNotifications({
   pushPermission,
+  notificationsEnabled,
   homeAwayStatus,
   currentLocation,
   spots,
@@ -107,6 +111,12 @@ export function useAppNotifications({
   const checkAndTriggerNotification = useCallback(async () => {
     // Skip if already triggered this session
     if (hasTriggeredRef.current) return
+
+    // Skip if notifications disabled in app settings
+    if (!notificationsEnabled) {
+      // console.log(LOG_PREFIX, "Skipping - notifications disabled in app settings")
+      return
+    }
 
     // Skip if permission not granted
     if (pushPermission !== "granted") {
@@ -244,7 +254,7 @@ export function useAppNotifications({
         hasTriggeredRef.current = true
       }
     }
-  }, [pushPermission, homeAwayStatus, currentLocation, spots, onNotificationAction])
+  }, [notificationsEnabled, pushPermission, homeAwayStatus, currentLocation, spots, onNotificationAction])
 
   // Trigger check when data is ready
   useEffect(() => {

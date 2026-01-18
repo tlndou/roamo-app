@@ -41,6 +41,7 @@ export function transformDbProfile(dbProfile: DbProfile): Profile {
     currentLocation: buildCurrentLocation(dbProfile),
     pushPermission: ((dbProfile as any).push_permission as PushPermission) || "default",
     pushAsked: (dbProfile as any).push_asked ?? false,
+    notificationsEnabled: (dbProfile as any).notifications_enabled ?? true, // Default to true for backwards compat
     createdAt: dbProfile.created_at,
     updatedAt: dbProfile.updated_at,
   }
@@ -270,6 +271,25 @@ export async function updatePushPermission(
     .update({
       push_permission: permission,
       push_asked: asked,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+
+  if (error) throw error
+}
+
+// Update notifications enabled preference (app-level toggle)
+export async function updateNotificationsEnabled(
+  userId: string,
+  enabled: boolean
+): Promise<void> {
+  const supabase = createClient()
+
+  const { error } = await supabase
+    .from("profiles")
+    // @ts-ignore - Supabase type inference issue
+    .update({
+      notifications_enabled: enabled,
       updated_at: new Date().toISOString(),
     })
     .eq("id", userId)

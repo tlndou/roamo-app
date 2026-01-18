@@ -302,6 +302,7 @@ export default function Home() {
   // App notifications (push notifications when permission granted)
   useAppNotifications({
     pushPermission: profile?.pushPermission ?? "default",
+    notificationsEnabled: profile?.notificationsEnabled ?? true,
     homeAwayStatus,
     currentLocation: profile?.currentLocation ?? null,
     spots,
